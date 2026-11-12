@@ -175,13 +175,38 @@ Ideas we did not build, if you want a harder version: an API step whose `expecte
 
 This is also where the harness is born. You can't check anything without a way to express a result and a way to run it, so build the minimal core here and immediately point it at `TOOL-1.json`. Later phases grow the harness next to the first thing that needs each piece, with no big framework up front.
 
-**Build** the gate core first, then the first gate on top of it. Each piece is a capability; the file it lives in here is in brackets.
+**Build** four things, in this order. Files in this repo are in brackets.
 
-- **A shared result vocabulary.** Every check returns one of `pass` / `warn` / `fail` with the gate's name and a message for the agent, and a set of results collapses into one decision: `fix_required` if anything failed, `continue` otherwise. One vocabulary means the hook, the CLI, CI and the evals all read results the same way. (`.agents/lib/gates/gateResults.ts`)
-- **One place for the facts a gate would otherwise hard-code:** directories, file patterns, timeouts. (`.agents/harness-config.ts`)
-- **A registry of stages.** Each stage declares which files it owns and which function reviews them. Start with a single `input` stage that owns the test case files; the CLI, hooks and CI all read the registry, so adding a stage later touches one list. (`.agents/manual-to-autotests-pipeline/pipeline.config.ts`)
-- **A command-line entry that reviews files.** Give it files or `--all` / `--stage`, it finds the owning stage, runs its review and exits non-zero when a gate fails, with `--json` for machines. The modes for hooks and CI (`--hook`, `--ci`, `--no-lint`, `--with-tests`) come when later phases need them. (`.agents/scripts/runGates-cli.ts`)
-- **The input contract and its gates:** a schema for the test case file and the checks that run on it. (`.agents/manual-to-autotests-pipeline/input-validation/`)
+1. **A gate runner.** A command that takes a file, finds the check suite that owns it, runs the checks, prints each result and exits non-zero if one failed. It is the one entry point the hook, CI and you will all call. (`.agents/scripts/runGates-cli.ts`, with the result types in `.agents/lib/gates/gateResults.ts` and the stage list in `.agents/manual-to-autotests-pipeline/pipeline.config.ts`)
+2. **Concrete input validation checks.** The schema for the test case file and the gates from the table above, as a function that takes the file and returns its results. (`.agents/manual-to-autotests-pipeline/input-validation/`)
+3. **One place for shared facts:** directories, file patterns and timeouts, so no check hard-codes a path. (`.agents/harness-config.ts`)
+4. **A hook that runs it automatically.** For now, run the runner by hand and by npm script (`npm run runGates`); you wire it to the agent's `stop` event and to git in Phase 5. A runner that works from the command line is what makes that wiring trivial.
+
+Build the runner first, with a single stage, and point it at `TOOL-1.json` before you write more checks. The whole idea fits on one screen:
+
+```ts
+type GateResult = { gate: string; status: 'pass' | 'warn' | 'fail'; detail?: string }   // one vocabulary for every check
+const hasFailure = (gates: GateResult[]) => gates.some(g => g.status === 'fail')
+
+type Stage = { id: string; owns: RegExp; review: (file: string) => GateResult[] }         // which files, and how to review one
+const STAGES: Stage[] = [{ id: 'input', owns: /test-cases\/[^/]+\.json$/, review: reviewInputFile }]
+
+function run(files: string[]): number {
+  let failed = false
+  for (const file of files) {
+    const stage = STAGES.find(s => s.owns.test(file))                                    // route the file to its stage
+    if (!stage) return EXIT_USAGE
+    const gates = stage.review(file)
+    for (const g of gates) out(`${ICON[g.status]} ${g.gate} ${g.detail ?? ''}`)          // the agent reads this output
+    failed ||= hasFailure(gates)                                                         // any fail blocks
+  }
+  return failed ? EXIT_FAILED : EXIT_OK                                                  // the exit code is what hooks and CI act on
+}
+
+process.exit(run(process.argv.slice(2)))
+```
+
+Why the stage list is data and not an `if` chain: the hook, the CLI and CI all read it, so adding a stage in Phase 2 is one new entry. Grow the runner when a phase needs it: `--all` and `--stage` (each stage also says how to list its files), `--json` for machines, and the hook and CI modes (`--hook`, `--ci`, `--no-lint`, `--with-tests`) in Phases 5 and 7. The real runner also turns failures into a follow-up message for the agent, using each stage's own rules text.
 
 Make the schema reject bad data itself, so the gates have less to do. A few lines carry most of the idea:
 
