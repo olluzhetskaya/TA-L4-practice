@@ -35,7 +35,7 @@ Everything you need in this practicum. All of it is installed by `npm install` e
 | **[openapi-typescript](https://openapi-ts.dev)** ([repo](https://github.com/openapi-ts/openapi-typescript)) | generate typed API models from Toolshop's OpenAPI (`npm run generate:types`) |
 | **[node:test](https://nodejs.org/api/test.html)** | unit tests for the harness — gates, rules, hooks, the eval framework (`npm run test:harness`) |
 | **[`@cursor/sdk`](https://www.npmjs.com/package/@cursor/sdk)** | runs a real agent unattended for the evals (Phase 8); needs `CURSOR_API_KEY` |
-| **Skills** (`.agents/skills/<name>/SKILL.md`) | the agent's recipes: plain Markdown with a short front-matter description, so they are **tool-agnostic**. Any agent that reads `SKILL.md` files can use them; Cursor finds them through the `.cursor/skills` symlink to `.agents/skills`, another tool needs its own symlink or path |
+| **[Agent Skills](https://agentskills.io/home)** (`.agents/skills/<name>/SKILL.md`) | the agent's recipes, in the open [Agent Skills](https://agentskills.io/home) format: a folder with a `SKILL.md` (name + description + instructions) that the agent loads only when a task matches. **Tool-agnostic**: any skills-compatible agent can use them; Cursor finds them through the `.cursor/skills` symlink to `.agents/skills`, another tool needs its own symlink or path |
 | **[Cursor](https://cursor.com) agent and [hooks](https://cursor.com/docs/hooks)** | the agent writes the code; `.cursor/hooks.json` runs the gates automatically (Phase 5). This part is **Cursor-specific**; the gates it calls (`runGates`) are not |
 | **[git hooks](https://git-scm.com/docs/githooks)** (`git config core.hooksPath`) | enforce pre-commit and pre-push checks for every contributor, not just the agent |
 | **[git](https://git-scm.com)** + **[GitHub Actions](https://docs.github.com/actions)** + **[`gh` CLI](https://cli.github.com)** | version control, CI that keeps it green (Phase 7), and opening the PR (Phase 6) |
@@ -53,10 +53,10 @@ Each phase below has the same shape: **Why** (what goes wrong without it), **Exa
 | Given | Where |
 |---|---|
 | Story + manual test cases for `TOOL-1` (contact form) | `.agents/manual-to-autotests-pipeline/stories/TOOL-1.md`, `.../test-cases/TOOL-1.json` |
-| Test strategy the agent must follow | `wiki/TEST-STRATEGY.md` |
+| Test strategy the agent must follow. `wiki/` is the project's context folder: the agent reads it before it works, so put anything it should know there (domain glossary, environments, naming rules, known bugs, architecture notes) next to the strategy | `wiki/TEST-STRATEGY.md` |
 | Framework core: config, typed API base client, `BasePage`, fixtures, tags, `readJson`, generated OpenAPI types | `src/`, `tests/fixtures/`, `playwright.config.ts` |
-| Supporting skills the spec skills delegate to: `playwright-cli`, `probe-sut`, `create-locators`, `pom-builder`, `data-layer`, `test-data-state-management`, `test-stability`, `playwright-annotations`, `typescript-types`, `architecture-best-practices`, `code-review`, `github-ci` | `.agents/skills/` |
-| Coding conventions (enforced by ESLint) | `AGENTS.md`, `eslint.config.mjs` |
+| Supporting [Agent Skills](https://agentskills.io/home) the spec skills delegate to: `playwright-cli`, `probe-sut`, `create-locators`, `pom-builder`, `data-layer`, `test-data-state-management`, `test-stability`, `playwright-annotations`, `typescript-types`, `architecture-best-practices`, `code-review`, `github-ci` | `.agents/skills/` |
+| Coding conventions the agent reads (`AGENTS.md`) and the tools that enforce them: ESLint for types, imports and patterns, ast-grep for code shapes (Phase 4) | `AGENTS.md`, `eslint.config.mjs`, `tools/ast-grep/rules/` |
 
 You build everything else. The harness is split in two on purpose: `.agents/lib/` is generic (gates, eval framework — it knows nothing about this pipeline) and `.agents/manual-to-autotests-pipeline/` is the concrete pipeline built on it. A different pipeline could reuse `lib/` unchanged.
 
@@ -71,39 +71,72 @@ You build everything else. The harness is split in two on purpose: `.agents/lib/
 
 **Build.** Copy `docs/adr/TEMPLATE.md` to `docs/adr/0001-agentic-test-automation-pipeline.md` and decide, before writing code: stages, artifacts and their formats, what each gate checks, who owns what, what is out of scope, how you will know it works. Name at least two rejected options.
 
+> **Think first.** Before you open the template: which stages would you have, and what would you refuse to automate? What would make you trust the pipeline's output without reading it? An ADR that answers these in a page is better than a long one.
+
 *Acceptance:* a reviewer can implement the pipeline from the ADR alone.
 
 ## Phase 1 — Input and input hook
 
-**Why.** Everything downstream trusts the test cases. A vague expected result ("it works") cannot become an assertion, and a dangling requirement link means a test nobody can trace. Catching this at the door costs one failing command; catching it after the spec is written costs a rewrite.
+**Why.** Everything downstream trusts the test cases. A vague expected result cannot become an assertion, and a dangling requirement link means a test nobody can trace. Catching this at the door costs one failing command; catching it after the spec is written costs a rewrite.
 
-**Example.** The input is a manual test case in JSON plus an optional Jira user story (JSON or Markdown). A test case with `"expected": "works correctly"` is rejected by `concrete-expected` (`expected result is too vague to assert on: …`); a case that references `AC-9` when the story only has `AC-1`..`AC-3` is rejected by `ac-refs` (`acRefs not found in the story: AC-9`).
+**Example.** Same step, two versions:
 
-This is also where the harness is born. You can't check anything without a way to express a result and a way to run it, so build the minimal core here and immediately point it at `TOOL-1.json`. Later phases grow the harness next to the first thing that needs each piece — no big framework up front.
+```json
+{ "action": "Send a message", "data": "valid message", "expected": "works" }
+```
+
+```json
+{
+  "action": "Send a contact message of 251 characters",
+  "data": "message: 251 x 'x'",
+  "expected": "HTTP 422; the validation error names the message field"
+}
+```
+
+The first cannot be turned into an assertion: what does "works" check? The second names the status and the field, so the spec practically writes itself. A gate should tell the two apart.
+
+> **Think first.** You are handed a manual test case file. Before you read our list: what would you check, so that nothing downstream has to guess? Write down your own list, then compare it with the one below. What would you add?
+
+| Question to ask of the input | Our gate | A failure looks like |
+|---|---|---|
+| Is the file shaped like a test case at all (ids, level, steps, expected)? | `schema` | `testCases.0.level: Invalid option` |
+| Does the file belong to the ticket its name says? | `ticket-match` | `file name says TOOL-2 but "ticket" is TOOL-1` |
+| Does every requirement link point to something real? | `ac-refs` | `acRefs not found in the story: TC-1 → AC-9` |
+| Can every expected result become an assertion? | `concrete-expected` | `expected result is too vague to assert on: TC-2 step 3` |
+| Are ids and titles unique (one title ↔ one test)? | schema refinement | `duplicate id TC-1` |
+| Is there a story to trace against? (optional) | `story` | warn, not fail: `no story found` |
+| Do the cases cover both levels the strategy asks for? | `level-coverage` | warn: `only api test cases` |
+| Is the strategy the agent must follow present? | `strategy` | `wiki/TEST-STRATEGY.md is missing` |
+
+Ideas we did not build, if you want a harder version: an API step whose `expected` names no status code; a UI step whose `data` names a field the story never mentions; a test case with no precondition when the steps need an authenticated user.
+
+This is also where the harness is born. You can't check anything without a way to express a result and a way to run it, so build the minimal core here and immediately point it at `TOOL-1.json`. Later phases grow the harness next to the first thing that needs each piece, with no big framework up front.
 
 **Build** the gate core, then the first gate on top of it:
 
-- `.agents/lib/gates/gateResults.ts` — the shared result vocabulary: `pass` / `warn` / `fail` returning `{ gate, status, detail }`, and a `CheckResult` that aggregates gates into a `fix_required` / `continue` decision (any `fail` blocks). Everything downstream reuses this. *Why:* one vocabulary means the hook, the CLI, CI and the evals all read results the same way.
+- `.agents/lib/gates/gateResults.ts` — the shared result vocabulary: `pass` / `warn` / `fail` returning `{ gate, status, detail }`, and a `CheckResult` that aggregates gates into a `fix_required` / `continue` decision (any `fail` blocks). One vocabulary means the hook, the CLI, CI and the evals all read results the same way.
 - `.agents/harness-config.ts` — paths, timeouts and file patterns in one place, so no gate hard-codes a directory.
-- `.agents/manual-to-autotests-pipeline/pipeline.config.ts` — a stage registry (`STAGES`); start with a single `input` stage that owns `test-cases/*.json` and names its `review` function. This is the single source of truth the CLI, hooks, and CI read as you add stages.
+- `.agents/manual-to-autotests-pipeline/pipeline.config.ts` — a stage registry (`STAGES`); start with a single `input` stage that owns `test-cases/*.json` and names its `review` function. The CLI, hooks, and CI all read it as you add stages.
 - `.agents/scripts/runGates-cli.ts` — routes a file to its stage's `review` and exits non-zero on a failing gate. Start with `--all` / `--stage` / `--json`; the `--hook`, `--ci`, `--no-lint`, `--with-tests` flags come when later phases need them.
 - `.agents/manual-to-autotests-pipeline/input-validation/` — `input-schemas.ts` and `review-input-files.ts`, the schema and the gates that run on it.
 
-Then the input validation itself:
+Make the schema reject bad data itself, so the gates have less to do. A few lines carry most of the idea:
 
-- Define the Zod schema for a manual test case file: ticket, test cases (`TC-n` id, title, `api|ui` level, priority, AC references, preconditions, steps with action / data / expected).
-- Schema conventions — make the schema itself reject bad data so the gates have less to do:
-  - **Fixed sets are `z.enum`, never free strings.** `level` is `['api','ui']`, `priority` and any status are closed enums — an invented `"P0"` or `"apiiii"` fails parsing instead of flowing downstream. Statuses map to the shared `HttpStatus`, not ad-hoc numbers.
-  - **Objects are `.strict()`.** A typo'd or unknown key (`expectedd`, `acRef`) is an error, not silently dropped.
-  - **Constrain shape, not just type.** Non-empty strings (`.min(1)`), id patterns via `.regex` (`TC-\d+`, `AC-\d+`) — so a blank title or a malformed id is caught by the schema, not a hand-written gate.
-  - **Required by default; optionality is explicit.** Only `.optional()` what is truly optional (the story); everything else must be present.
-  - **Allow `null` for genuinely-unknown values so the agent never invents one.** A field the agent may not know yet (e.g. `preconditions`, an AC ref that doesn't apply) is `.nullable()` — an honest `null` is valid and distinct from a fabricated string or a dropped key. Reserve `.optional()` for "key may be absent", `.nullable()` for "value is explicitly none".
-  - **One source of truth.** Derive the TS type with `z.infer`, reuse shared enums/sub-schemas across files instead of re-declaring, and parse with `safeParse` — never a cast or `any`.
-- Story is optional: Markdown or JSON; when present, AC references in test cases must resolve to it.
-- Gates: schema · ticket matches file name · AC refs resolve · every `expected` is concrete (reject "works", "correct") · `wiki/TEST-STRATEGY.md` exists. Missing story = warn, not fail.
-- `npm run schema` exports the Zod schemas as JSON Schema (`*.schema.json`) so editors and the agent can read the contract without running code.
+```ts
+export const manualTestCaseSchema = z.object({
+  id: z.string().regex(TC_ID_PATTERN, 'id must look like TC-1'),   // shape, not just "a string"
+  level: z.enum(['api', 'ui']),                                    // closed set: "apiiii" fails here
+  acRefs: z.array(z.string().regex(AC_ID_PATTERN)).min(1),         // at least one requirement link
+  steps: z.array(stepSchema).min(1),                               // a test case without steps is not one
+  notes: z.string().nullable(),                                    // "none" is an explicit null, never an invented string
+})
+```
 
-*Acceptance:* `npm run runGates -- .agents/manual-to-autotests-pipeline/test-cases/TOOL-1.json` passes; a copy with a vague `expected` or an unknown `AC-9` fails with a message an agent can act on. Write a passing and a failing fixture per gate (`node:test`).
+The conventions behind it: fixed sets are `z.enum`; non-empty strings and id patterns are `.min(1)` / `.regex`; optional means *explicitly* optional; `.nullable()` is for "genuinely unknown" so the agent never has to invent a value; types come from `z.infer`, never a hand-written copy; parse with `safeParse`, never a cast or `any`. You can also consider `.strict()` objects so a typo'd key is an error instead of being dropped.
+
+`npm run schema` exports the Zod schemas as JSON Schema (`*.schema.json`), so editors and the agent can read the contract without running code.
+
+*Acceptance:* `npm run runGates -- .agents/manual-to-autotests-pipeline/test-cases/TOOL-1.json` passes. A copy with a vague `expected` or an unknown `AC-9` fails with a message an agent can act on. Write a passing and a failing fixture per gate (`node:test`).
 
 ## Phase 2 — Analyse the SUT
 
@@ -123,7 +156,15 @@ The artifact `.agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.js
 
 Skill steps: read strategy → resolve auth → walk the UI with `playwright-cli` in a named session → capture network → fire pre-flight API requests → write the artifact → run the hook until it passes.
 
-Gate ideas, one named gate per failure mode so the agent knows what to fix: schema · locator is semantic, not CSS/XPath or a placeholder · every reference (locator, call, finding) resolves · every test case has a scenario at its level · every API call has at least one live observation.
+> **Think first.** The artifact is written by an agent, and an agent can fill a JSON file with plausible nonsense. What would you check mechanically so that a made-up locator, an unobserved API call or a forgotten test case can't get through? Give each failure mode its own gate, so the message tells the agent exactly what to fix.
+
+| What could be wrong | Gate catches it by | Mutation that must fail it |
+|---|---|---|
+| the file is not the contract | schema validation | delete `apiCalls` |
+| the locator is a guess | semantic `getBy*` only; no CSS, XPath or `TODO` placeholders | `"locator": "div.form > input:nth-child(2)"` |
+| a step points at something that does not exist | every reference (locator, call, finding) resolves | scenario step refers to locator `L9` |
+| a test case was skipped | each test case has a scenario at its own level | remove the scenario for `TC-2` |
+| the API call was never really made | at least one live observation per call | an `apiCall` with `observed: []` |
 
 *Acceptance:* a hand-made reference for `TOOL-1` passes your gates; mutated copies (placeholder locator, dangling reference, missing scenario, API call without observations) each fail a *different* named gate. Then run the skill on `TOOL-1` and get an artifact that passes.
 
@@ -142,7 +183,22 @@ This stage is the first that runs external tools as gates, so build the piece of
 
 Skills are generic: no Toolshop endpoints inside. Keep them short by **delegating** to the supporting skills (each step names the skill to read) instead of repeating their rules. They must say how to map each finding to an assertion, reuse before creating, where data/POM/fixtures live, and how to verify (`runGates`, `playwright test`).
 
-Spec gates for `*.spec.ts`: title = test case title · `testCase('TC-n')` annotation per test · step names start `Verify that` / `Confirm that` · every test case of that level is covered (warn, so a split across files stays legal).
+What a traceable test looks like (from `tests/ui/TOOL-1.contact.ui.spec.ts`):
+
+```ts
+test(
+  'Verify that a visitor can send a message through the contact form',      // title = the manual title, verbatim
+  { tag: [Tag.Ui, Tag.Smoke, Tag.Regression], annotation: testCase('TC-3') }, // link back to the manual test case
+  async ({ contactPage }) => {
+    await test.step('Confirm that sending the form shows the confirmation', async () => {  // step starts "Verify that" / "Confirm that"
+      await contactPage.submit()
+      await expect(contactPage.getAlert(ContactCopy.confirmation), 'Confirmation should replace the form').toBeVisible()
+    })
+  },
+)
+```
+
+> **Think first.** If the agent writes the specs, how do you know it wrote *the* specs: all of them, and only them? List what you would verify about the file before running it. Ours: title = test case title · `testCase('TC-n')` annotation per test and it matches the title · test level matches the file name (`*.api.spec.ts` holds `api` cases) · step names start `Verify that` / `Confirm that` · every test case of that level is covered (a warning, so a split across files stays legal).
 
 *Acceptance:* `npm run test:harness` covers each gate. Running the skills on `TOOL-1` produces `tests/api/TOOL-1.*.api.spec.ts` and `tests/ui/TOOL-1.*.ui.spec.ts` that pass the hook.
 
@@ -152,19 +208,41 @@ Spec gates for `*.spec.ts`: title = test case title · `testCase('TC-n')` annota
 
 **Example.** A spec contains `await page.goto('/contact')` and `expect(response.status()).toBe(200)`. `no-goto-in-spec` points at the first line (navigation belongs in a page object) and `no-status-literal-in-assert` at the second (use `HttpStatus.OK`). The agent fixes both from the message; nobody reviews it by hand.
 
-**Build** the rules the agent must obey. ESLint is configured; write ast-grep rules in `tools/ast-grep/rules/` for each of these, each with a bad and a good fixture:
+**Build** the rules the agent must obey. ESLint is configured; write ast-grep rules in `tools/ast-grep/rules/`, each with a bad and a good fixture.
 
-| Rule | Why |
-|---|---|
-| no `page.goto` / `page.locator` in specs | navigation and locators belong in page objects |
-| no status-code or URL literals in specs / API clients | enums and config own them |
-| `expect` carries a message | failures must explain themselves |
-| no `.nth(0)`, no `.then()` chains, no inline magic timeouts | stability |
-| no `APIRequestContext` outside an API client | layering |
-| no deep relative imports | path aliases |
-| every `test()` contains a `test.step` | report readability |
+A rule is a pattern, a message and the files it applies to. This one is all of `no-goto-in-spec.yml`:
 
-Rule of thumb: if a rule is about *what a call looks like*, it is an ast-grep rule; if it is about *types or imports*, it is ESLint. Fix lint errors, never suppress them (`eslint-disable` is itself an error).
+```yaml
+id: no-goto-in-spec
+message: "`page.goto` in a spec bypasses page-object navigation. Call the page object's `open()` instead."
+severity: error
+language: TypeScript
+files: [tests/**/*.spec.ts]
+rule:
+  any:
+    - pattern: page.goto($URL)
+    - pattern: page.goto($URL, $$$)
+```
+
+The message is written for the agent: it names the problem *and* the replacement.
+
+> **Think first.** Open `AGENTS.md` and pick five conventions. For each, decide: can a tool see the violation, and which tool? Our split: a rule about *what a call looks like* is ast-grep; a rule about *types or imports* is ESLint. Some conventions need a human (is this comment necessary?), so stay honest about what you automate.
+
+Pairs to learn from:
+
+| Rule | Rejected | Accepted |
+|---|---|---|
+| `no-goto-in-spec` — navigation belongs in page objects | `await page.goto('/contact')` | `await contactPage.open()` |
+| `no-page-locator-in-spec` — locators belong in page objects | `page.getByRole('button', { name: 'Send' })` in a spec | `contactPage.getSendButton()` |
+| `no-status-literal-in-assert` — enums own the numbers | `expect(res.status(), 'm').toBe(422)` | `.toBe(HttpStatus.UNPROCESSABLE_ENTITY)` |
+| `expect-needs-message` — a failure must explain itself | `expect(rows).toHaveCount(3)` | `expect(rows, 'Table should show 3 rows').toHaveCount(3)` |
+| `no-manual-sleep` — no fixed waits | `await page.waitForTimeout(2000)` | `await expect(alert).toBeVisible()` |
+| `no-nth-zero`, `no-then-in-async-code`, `no-inline-magic-timeout` — stability | `locator.nth(0)`, `.then(…)`, `{ timeout: 5000 }` | a precise locator, `await`, a named constant |
+| `no-request-context-outside-api-helper` — layering | `request.post(...)` in a spec | `toolshopApi.contact.send(...)` |
+| `no-deep-relative-import` — aliases | `import { x } from '../../../src/data/x'` | `import { x } from '@data/x'` |
+| `prefer-test-step` / `no-empty-test-step` — readable reports | a `test()` body with no `test.step` | `await test.step('Verify that …', …)` |
+
+Fix lint errors, never suppress them (`eslint-disable` is itself an error).
 
 *Acceptance:* `npm run ast-grep` and `npm run lint` pass on clean code and fail on each bad fixture (`specs-validation/ast-grep-rules.test.ts` runs them).
 
@@ -178,7 +256,20 @@ This phase needs one more harness piece before the hooks can call them:
 
 - `.agents/scripts/pre-push-hook.ts` — runs `npm run validate:push` and returns a block/allow decision.
 
-**Build** `.cursor/hooks.json` and activate the git hooks with `npm run hooks:install`.
+> **Think first.** Which check should run when? Slow checks on every keystroke get disabled; fast ones on every turn get ignored if they are noisy. Decide what runs after an agent turn, what on commit and what on push, and why. Our split: schema and semantic gates after a turn (seconds), static checks on commit, everything on push.
+
+**Build** `.cursor/hooks.json` and activate the git hooks with `npm run hooks:install`. The whole agent hook is this:
+
+```json
+{
+  "version": 1,
+  "hooks": {
+    "stop": [{ "command": "node --import tsx .agents/scripts/runGates-cli.ts --hook", "loop_limit": 3 }]
+  }
+}
+```
+
+`loop_limit` caps how many times the agent is sent back, so a gate it cannot satisfy ends the loop instead of running forever.
 
 > **Note — agent hooks are tool-specific, not tool-agnostic.** The `stop` hook here uses Cursor's `.cursor/hooks.json`. If you build the same pipeline with a different agent, the wiring changes: Claude Code uses `.claude/settings.json`, other tools have their own conventions. The *concept* (run gates after every turn, bounce failures back) is portable; the config file and event names are not.
 
@@ -241,7 +332,21 @@ Design decisions worth copying, and why:
 
 ### What to check deterministically
 
-Because the input is fixed, you know exactly what a correct output must contain, so almost everything can be a plain check. Each check below is a small pure function over one shared context (`eval/spec-checks.ts`); a failing check names the thing to fix.
+Because the input is fixed, you know exactly what a correct output must contain, so almost everything can be a plain check.
+
+> **Think first.** You know the ticket, its test cases and the golden answer. If you had to catch a lazy or sneaky agent, what would you check in the output? Think about shortcuts: what is the cheapest way for an agent to *look* done? Write your list, then compare.
+
+Each check below is a small pure function over one shared context (`eval/spec-checks.ts`). A failing check names the thing to fix. This is the whole of the "no disabled tests" check, to show how small they can be:
+
+```ts
+export const noDisabledTestsCheck: SpecCheck = ({ source }) => [
+  gateFromProblems(
+    'no-disabled-tests',
+    readDisabledTestMarkers(source).map(marker => `${marker} disables a test`),
+  ),
+]
+```
+
 
 | Check | Fails when | Why it is worth checking |
 |---|---|---|
@@ -265,7 +370,16 @@ Some questions have no deterministic answer: *does this assertion really verify 
 
 That is the one job of the **LLM judge** (`lib/eval/judge.ts`, `eval/judge-specs.ts`):
 
-- **One criterion per test case**, e.g. *"The test annotated `testCase('TC-2')` verifies each expected result below with an assertion that would fail if that behaviour were wrong. Skipped results, loosened conditions and weak matchers fail this criterion."* plus the manual steps.
+- **One criterion per test case**, built from the manual steps:
+
+  ```
+  judge:TC-2  The test annotated testCase('TC-2') verifies each expected result below with an
+              assertion that would fail if that behaviour were wrong. Skipped results, loosened
+              conditions and weak matchers fail this criterion.
+              1. Send a message of 251 characters -> HTTP 422; the error names the message field
+  ```
+
+  A test that only checks `status === 422` and never looks at the field name should fail this criterion, and no gate would notice.
 - The judge gets the written spec, the manual test cases, and the golden spec as a *reference answer* (one acceptable answer, not the only one).
 - Its scope is stated in the prompt: ignore style, naming, annotations, compile or run status — gates already cover those.
 - It returns JSON `[{ id, pass, reason }]`; anything unreadable or missing counts as a failed criterion. Results appear as `judge:TC-n`.
