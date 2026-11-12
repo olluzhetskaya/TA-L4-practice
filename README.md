@@ -35,7 +35,8 @@ Everything you need in this practicum. All of it is installed by `npm install` e
 | **[openapi-typescript](https://openapi-ts.dev)** ([repo](https://github.com/openapi-ts/openapi-typescript)) | generate typed API models from Toolshop's OpenAPI (`npm run generate:types`) |
 | **[node:test](https://nodejs.org/api/test.html)** | unit tests for the harness — gates, rules, hooks, the eval framework (`npm run test:harness`) |
 | **[`@cursor/sdk`](https://www.npmjs.com/package/@cursor/sdk)** | runs a real agent unattended for the evals (Phase 8); needs `CURSOR_API_KEY` |
-| **[Cursor](https://cursor.com) agent, [skills](https://cursor.com/docs/skills), and [hooks](https://cursor.com/docs/hooks)** | the agent writes the code; skills are its recipes; `.cursor/hooks.json` runs the gates automatically (Phase 5) |
+| **Skills** (`.agents/skills/<name>/SKILL.md`) | the agent's recipes: plain Markdown with a short front-matter description, so they are **tool-agnostic**. Any agent that reads `SKILL.md` files can use them; Cursor finds them through the `.cursor/skills` symlink to `.agents/skills`, another tool needs its own symlink or path |
+| **[Cursor](https://cursor.com) agent and [hooks](https://cursor.com/docs/hooks)** | the agent writes the code; `.cursor/hooks.json` runs the gates automatically (Phase 5). This part is **Cursor-specific**; the gates it calls (`runGates`) are not |
 | **[git hooks](https://git-scm.com/docs/githooks)** (`git config core.hooksPath`) | enforce pre-commit and pre-push checks for every contributor, not just the agent |
 | **[git](https://git-scm.com)** + **[GitHub Actions](https://docs.github.com/actions)** + **[`gh` CLI](https://cli.github.com)** | version control, CI that keeps it green (Phase 7), and opening the PR (Phase 6) |
 
