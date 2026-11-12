@@ -109,7 +109,7 @@ The full folder map is under [Layout](#layout).
 
 **Why.** Everything downstream trusts the test cases. A vague expected result cannot become an assertion, and a dangling requirement link means a test nobody can trace. Catching this at the door costs one failing command; catching it after the spec is written costs a rewrite.
 
-**Example.** The input is what Jira and [Xray](https://docs.getxray.app/space/XRAY/301474262/Tests+-+REST) give you: one Jira issue of type *Test* per manual test case, exported with a search (`GET /rest/api/2/search?jql=issue in linkedIssues(TOOL-1)`). This is one step of `TC-1`, trimmed to the fields we use:
+**Example.** The input is what Jira and [Xray](https://docs.getxray.app/space/XRAY/301474262/Tests+-+REST) give you: one Jira issue of type *Test* per manual test case, exported with a search, refined or annotated by humans or agents:
 
 ```json
 {
@@ -140,21 +140,10 @@ The full folder map is under [Layout](#layout).
 }
 ```
 
-The test's own `summary` is its **objective** (`Verify that …`, `Confirm that …`), written as a SMART goal: one specific subject, a measurable outcome, small enough for one test. It is also the test's title, so it appears in every report. The links carry no objective: the `Test` link names the story by key, and a `Precondition` link carries the precondition's text.
-
-| | Summary | Why |
-|---|---|---|
-| ✗ | `Contact form` | a topic, not an objective: what is verified? |
-| ✗ | `Verify that the contact form works` | not measurable: "works" can't be asserted |
-| ✓ | `Verify that a visitor can send a message through the contact form` | one actor, one action, one observable outcome |
-| ✓ | `Verify that the contact API rejects invalid messages and accepts a boundary-length message` | measurable (rejects / accepts), bounded by named cases |
-
-Openers such as `Verify that` or `Confirm that` help, but no gate checks the wording: whether a goal is truly SMART is a review question.
-
 Now compare two versions of one step's expected result:
 
 ```json
-{ "action": "Send a message", "data": "valid message", "expected result": "works" }
+{ "action": "Send a message", "data": "invalid message", "expected result": "not work" }
 ```
 
 ```json
@@ -165,9 +154,9 @@ Now compare two versions of one step's expected result:
 }
 ```
 
-The first cannot be turned into an assertion: what does "works" check? The second names the status and the field, so the spec practically writes itself. A gate should tell the two apart.
+The first cannot be turned into an assertion: what does "not work" check? The second names the status and the field, so the spec practically writes itself. A gate should tell the two apart.
 
-The file is not frozen: a person or the agent may refine it (sharpen a vague `expected result`, add a missing precondition, split a case). The input schema and gates run on every change through the stop hook, so whatever edits the file, the Jira/Xray shape and the rules above stay enforced.
+A person or the agent may refine it (sharpen a vague `expected result`, add a missing precondition, split a case). The input schema and gates run on every change through the stop hook, so whatever edits the file, the Jira/Xray shape and the rules above stay enforced.
 
 > **Think first.** You are handed a manual test case file. Before you read our list: what would you check, so that nothing downstream has to guess? Write down your own list, then compare it with the one below. What would you add?
 
