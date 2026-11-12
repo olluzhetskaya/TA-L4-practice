@@ -139,6 +139,18 @@ The full folder map is under [Layout](#layout).
   }
 }
 ```
+
+The test's own `summary` is its **objective**, written as a SMART goal: one specific subject, a measurable outcome, small enough for one test. It is also the test's title, so it appears in every report. (The `summary` inside the story link is only the story's title.)
+
+| | Summary | Why |
+|---|---|---|
+| ✗ | `Contact form` | a topic, not an objective: what is verified? |
+| ✗ | `Verify that the contact form works` | not measurable: "works" can't be asserted |
+| ✓ | `Verify that a visitor can send a message through the contact form` | one actor, one action, one observable outcome |
+| ✓ | `Verify that the contact API rejects invalid messages and accepts a boundary-length message` | measurable (rejects / accepts), bounded by named cases |
+
+A gate can check the *form* (starts with `Verify that`, long enough to hold a subject, an action and an outcome). Whether the goal is truly SMART stays a review question.
+
 Now compare two versions of one step's expected result:
 
 ```json
@@ -164,6 +176,7 @@ Our file is an *export*, not something we upload, so it stays plain JSON you cou
 | Is the file shaped like a Jira/Xray test export at all (key, summary, component, steps, expected result)? | `schema` | `issues.0.fields.components: Invalid input: expected array` |
 | Does the file belong to the story its name says (every test links to one story, and the same one)? | `ticket-match`, schema | `file name says TOOL-2 but "ticket" is TOOL-1` |
 | Does every requirement link point to something real? | `ac-refs` | `acRefs not found in the story: TC-1 → AC-9` |
+| Does the summary state one checkable objective? | `objective` | `TC-3 must start with "Verify that"` |
 | Can every expected result become an assertion? | `concrete-expected` | `expected result is too vague to assert on: TC-2 step 3` |
 | Are ids and titles unique (one title ↔ one test)? | schema refinement | `duplicate id TC-1` |
 | Is there a story to trace against? (optional) | `story` | warn, not fail: `no story found` |
