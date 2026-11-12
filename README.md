@@ -175,13 +175,13 @@ Ideas we did not build, if you want a harder version: an API step whose `expecte
 
 This is also where the harness is born. You can't check anything without a way to express a result and a way to run it, so build the minimal core here and immediately point it at `TOOL-1.json`. Later phases grow the harness next to the first thing that needs each piece, with no big framework up front.
 
-**Build** the gate core, then the first gate on top of it:
+**Build** the gate core first, then the first gate on top of it. Each piece is a capability; the file it lives in here is in brackets.
 
-- `.agents/lib/gates/gateResults.ts` — the shared result vocabulary: `pass` / `warn` / `fail` returning `{ gate, status, detail }`, and a `CheckResult` that aggregates gates into a `fix_required` / `continue` decision (any `fail` blocks). One vocabulary means the hook, the CLI, CI and the evals all read results the same way.
-- `.agents/harness-config.ts` — paths, timeouts and file patterns in one place, so no gate hard-codes a directory.
-- `.agents/manual-to-autotests-pipeline/pipeline.config.ts` — a stage registry (`STAGES`); start with a single `input` stage that owns `test-cases/*.json` and names its `review` function. The CLI, hooks, and CI all read it as you add stages.
-- `.agents/scripts/runGates-cli.ts` — routes a file to its stage's `review` and exits non-zero on a failing gate. Start with `--all` / `--stage` / `--json`; the `--hook`, `--ci`, `--no-lint`, `--with-tests` flags come when later phases need them.
-- `.agents/manual-to-autotests-pipeline/input-validation/` — `input-schemas.ts` and `review-input-files.ts`, the schema and the gates that run on it.
+- **A shared result vocabulary.** Every check returns one of `pass` / `warn` / `fail` with the gate's name and a message for the agent, and a set of results collapses into one decision: `fix_required` if anything failed, `continue` otherwise. One vocabulary means the hook, the CLI, CI and the evals all read results the same way. (`.agents/lib/gates/gateResults.ts`)
+- **One place for the facts a gate would otherwise hard-code:** directories, file patterns, timeouts. (`.agents/harness-config.ts`)
+- **A registry of stages.** Each stage declares which files it owns and which function reviews them. Start with a single `input` stage that owns the test case files; the CLI, hooks and CI all read the registry, so adding a stage later touches one list. (`.agents/manual-to-autotests-pipeline/pipeline.config.ts`)
+- **A command-line entry that reviews files.** Give it files or `--all` / `--stage`, it finds the owning stage, runs its review and exits non-zero when a gate fails, with `--json` for machines. The modes for hooks and CI (`--hook`, `--ci`, `--no-lint`, `--with-tests`) come when later phases need them. (`.agents/scripts/runGates-cli.ts`)
+- **The input contract and its gates:** a schema for the test case file and the checks that run on it. (`.agents/manual-to-autotests-pipeline/input-validation/`)
 
 Make the schema reject bad data itself, so the gates have less to do. A few lines carry most of the idea:
 
@@ -214,7 +214,7 @@ The conventions behind it: fixed sets are `z.enum`; non-empty strings and id pat
 
 **Example.** The test case says "fill in *Email*" and "expect HTTP 201". The live page's field is labelled *Email address*, and the API answers `200` with the record. The artifact records the real label as the locator, the observed `200` as the response, and a finding `assert-observed` that explains the difference. The spec then asserts `200`.
 
-**Build** `.agents/skills/analyse-sut/` — `SKILL.md`, `scripts/schema.ts`, `scripts/gates/`, `scripts/review-exploration-file.ts`.
+**Build** the analysis as a skill plus its checks (all in `.agents/skills/analyse-sut/`): the **recipe** the agent follows (`SKILL.md`), the **schema** of the artifact it must write (`scripts/schema.ts`, exported to JSON Schema for the agent to read), one **gate per failure mode** (`scripts/gates/`), and a **review entry** that runs them on an artifact so the stage registry can call it (`scripts/review-exploration-file.ts`).
 
 The artifact `.agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json` is the contract between analysis and implementation. It must hold:
 
@@ -244,12 +244,12 @@ Skill steps: read strategy → resolve auth → walk the UI with `playwright-cli
 
 **Example.** The agent writes `test('contact form works', …)` with no annotation. The `tc-trace` gate fails: `"contact form works" is not a test case title in TOOL-1`. After the fix the test is titled `Verify that a visitor can send a message through the contact form` (the manual title, verbatim) and carries `annotation: testCase('TC-3')`, which links it back to the manual test case.
 
-**Build** `.agents/skills/create-api-spec/SKILL.md`, `.agents/skills/create-ui-spec/SKILL.md`, and the specs stage in `.agents/manual-to-autotests-pipeline/specs-validation/`.
+**Build** two recipes, one for API specs and one for UI specs (`.agents/skills/create-api-spec/`, `.agents/skills/create-ui-spec/`), and a `specs` stage that checks what they produce (`.agents/manual-to-autotests-pipeline/specs-validation/`).
 
 This stage is the first that runs external tools as gates, so build the piece of harness that enables it:
 
-- `.agents/lib/gates/commandGate.ts` — wraps any CLI as a gate: exit 0 = pass, otherwise fail with the tail of the output so the agent can act on it verbatim. The spec review (`review-spec-file.ts`) uses it to run eslint and ast-grep as gates; CI, the pre-push runner and the evals reuse it later.
-- the traceability gates themselves (`spec-gates.ts`), registered as a `specs` stage in `STAGES`.
+- **Any command-line tool as a gate:** exit 0 is a pass, anything else is a fail carrying the tail of the output, so the agent can act on it verbatim. The spec review uses it to run eslint and ast-grep; CI, the push check and the evals reuse it later. (`.agents/lib/gates/commandGate.ts`)
+- **The traceability gates**, registered as a `specs` stage in the stage registry. (`specs-validation/spec-gates.ts`)
 
 Skills are generic: no Toolshop endpoints inside. Keep them short by **delegating** to the supporting skills (each step names the skill to read) instead of repeating their rules. They must say how to map each finding to an assertion, reuse before creating, where data/POM/fixtures live, and how to verify (`runGates`, `playwright test`).
 
@@ -324,7 +324,7 @@ Fix lint errors, never suppress them (`eslint-disable` is itself an error).
 
 This phase needs one more harness piece before the hooks can call them:
 
-- `.agents/scripts/pre-push-hook.ts` — runs `npm run validate:push` and returns a block/allow decision.
+- **A push check:** a script that runs the full validation and answers allow or block, with the reason. (`.agents/scripts/pre-push-hook.ts`)
 
 > **Think first.** Which check should run when? Slow checks on every keystroke get disabled; fast ones on every turn get ignored if they are noisy. Decide what runs after an agent turn, what on commit and what on push, and why. Our split: schema and semantic gates after a turn (seconds), static checks on commit, everything on push.
 
