@@ -50,15 +50,45 @@ Each phase below has the same shape: **Why** (what goes wrong without it), **Exa
 
 ## What you are given
 
+Think of the repo in two layers: the **starting point** you are handed, and the **finished pipeline** you build phase by phase. The second table is a map of every part of the finished one. Open it when you reach that phase, or later when you adopt a piece in your own project.
+
+### The starting point
+
 | Given | Where |
 |---|---|
 | Story + manual test cases for `TOOL-1` (contact form) | `.agents/manual-to-autotests-pipeline/stories/TOOL-1.md`, `.../test-cases/TOOL-1.json` |
 | Test strategy the agent must follow. `wiki/` is the project's context folder: the agent reads it before it works, so put anything it should know there (domain glossary, environments, naming rules, known bugs, architecture notes) next to the strategy | `wiki/TEST-STRATEGY.md` |
-| Framework core: config, typed API base client, `BasePage`, fixtures, tags, `readJson`, generated OpenAPI types | `src/`, `tests/fixtures/`, `playwright.config.ts` |
+| Framework core the specs sit on: env config and timeouts, typed API base client + `AuthApi`/`ContactApi`, `readJson` (Zod-parsed responses), `BasePage` + `ContactPage`, test data builders and enums, fixtures, tags, generated OpenAPI types | `src/`, `tests/fixtures/`, `playwright.config.ts` |
 | Supporting [Agent Skills](https://agentskills.io/home) the spec skills delegate to: `playwright-cli`, `probe-sut`, `create-locators`, `pom-builder`, `data-layer`, `test-data-state-management`, `test-stability`, `playwright-annotations`, `typescript-types`, `architecture-best-practices`, `code-review`, `github-ci` | `.agents/skills/` |
 | Coding conventions the agent reads (`AGENTS.md`) and the tools that enforce them: ESLint for types, imports and patterns, ast-grep for code shapes (Phase 4) | `AGENTS.md`, `eslint.config.mjs`, `tools/ast-grep/rules/` |
 
-You build everything else. The harness is split in two on purpose: `.agents/lib/` is generic (gates, eval framework — it knows nothing about this pipeline) and `.agents/manual-to-autotests-pipeline/` is the concrete pipeline built on it. A different pipeline could reuse `lib/` unchanged.
+### The finished pipeline (what you build)
+
+The harness is split in two on purpose. `.agents/lib/` is **generic**: it knows nothing about test cases or Playwright, so a different pipeline could reuse it unchanged. `.agents/manual-to-autotests-pipeline/` is the **concrete pipeline** built on it.
+
+| Part | What it is | Where | Phase |
+|---|---|---|---|
+| Design record | the decision, the rejected options, the stage table | `docs/adr/` | 0 |
+| Gate core | `pass` / `warn` / `fail` results and the `fix_required` / `continue` decision | `.agents/lib/gates/gateResults.ts` | 1 |
+| Harness config | paths, timeouts, file patterns, eval protected files | `.agents/harness-config.ts` | 1 |
+| Stage registry | the one list of stages: which files each owns, how to review them | `.agents/manual-to-autotests-pipeline/pipeline.config.ts` | 1 |
+| Gate CLI | one entry for hook, CLI and CI (`npm run runGates`) | `.agents/scripts/runGates-cli.ts` | 1 |
+| Input hook | test case and story schemas + gates | `.agents/manual-to-autotests-pipeline/input-validation/` | 1 |
+| Analyse skill + gates | the skill, the artifact schema, five exploration gates | `.agents/skills/analyse-sut/` | 2 |
+| Spec skills | `create-api-spec`, `create-ui-spec` | `.agents/skills/create-*-spec/` | 3 |
+| Spec gates | traceability: title, annotation, level, step names, coverage | `.agents/manual-to-autotests-pipeline/specs-validation/` | 3 |
+| Command gate | wraps any CLI (eslint, ast-grep, tsc, Playwright) as a gate | `.agents/lib/gates/commandGate.ts` | 3 |
+| Lint rules | ESLint config + ast-grep rules with their tests | `eslint.config.mjs`, `tools/ast-grep/` | 4 |
+| Hooks | Cursor `stop` hook, git pre-commit and pre-push, the pre-push runner | `.cursor/hooks.json`, `.githooks/`, `.agents/scripts/pre-push-hook.ts` | 5 |
+| Specs | the generated API and UI specs for `TOOL-1` | `tests/api/`, `tests/ui/` | 6 |
+| CI | validate, then the api/ui matrix, with reports | `.github/workflows/tests.yml` | 7 |
+| Eval framework | generic runner, checks, scoring, judge, report | `.agents/lib/eval/` | 8 |
+| Eval tasks and graders | dataset loader, workspace builder, spec checks, protected files, per-case run, judge rubric | `.agents/manual-to-autotests-pipeline/eval/` | 8 |
+| Eval data | tickets `TOOL-1..3` with golden artifact and golden specs; the skeleton overlay | `.agents/manual-to-autotests-pipeline/eval/dataset/`, `.../eval/skeleton/` | 8 |
+| Eval commands | live run and golden calibration | `scripts/run-eval.ts`, `scripts/verify-goldens.ts` | 8 |
+| Harness tests | `node:test` for every gate, rule, hook and eval piece (`npm run test:harness`) | `*.test.ts` under `.agents/` | all |
+
+The full folder map is under [Layout](#layout).
 
 ## Phase 0 — ADR
 
