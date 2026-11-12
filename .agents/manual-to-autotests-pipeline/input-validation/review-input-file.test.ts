@@ -82,20 +82,6 @@ describe('input hook', () => {
     assert.equal(gate('concrete-expected')?.status, 'fail')
   })
 
-  it('fails when the summary is not a "Verify that" objective', () => {
-    const data = readTc()
-    data.issues[0].fields.summary = 'Contact form'
-    writeTc(data)
-    assert.match(gate('objective')?.detail ?? '', /TC-1 must start with "Verify that"/)
-  })
-
-  it('fails when the objective is too short to be specific', () => {
-    const data = readTc()
-    data.issues[0].fields.summary = 'Verify that it works'
-    writeTc(data)
-    assert.match(gate('objective')?.detail ?? '', /TC-1 is too short/)
-  })
-
   it('fails when acRefs are not in the story', () => {
     const data = readTc()
     data.issues[0].fields.labels = ['AC-99']

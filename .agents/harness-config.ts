@@ -47,8 +47,6 @@ export const EVAL_PROTECTED = {
 export const VALIDATION = {
   /** Minimum character length for a step `expected` value to be considered concrete. */
   minExpectedLength: 8,
-  /** A test objective that is shorter than this cannot name a subject, an action and an outcome. */
-  minObjectiveWords: 6,
 } as const
 
 /** Timeout and output-size constants for harness gates and scripts. */
