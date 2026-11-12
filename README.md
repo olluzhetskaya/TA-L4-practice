@@ -207,11 +207,11 @@ gh pr create --fill
 
 ## Phase 7 — CI that keeps it green
 
-**Why.** A suite that was green on your machine on Tuesday says nothing about Friday. CI re-runs everything on every change, and a *scheduled* run catches the case that matters most for a suite on a live system: nobody touched the code, but the system changed.
+**Why.** A suite that was green on your machine on Tuesday says nothing about Friday. CI re-runs everything on every change, and a *scheduled* run catches the case that matters most for a suite on a live system: nobody touched the code, but the system changed. (An alert job that opens an issue on a red scheduled run is a natural next step; it is left out here to keep the workflow small.)
 
-**Example.** The nightly run fails because the SUT changed a validation message. The workflow opens an issue ("Scheduled test run is red", with a link to the run) and, if one is already open, adds a comment instead of a second issue. The HTML report is attached either way.
+**Example.** The nightly run fails because the SUT changed a validation message. The run goes red in the Actions tab and its HTML report is attached, so you can see which assertion broke and open the trace.
 
-**Build** `.github/workflows/tests.yml`: triggers on `pull_request`, `push` to `main`, a weekday `schedule`, and `workflow_dispatch`. Jobs: **validate** (`npm ci`, `validate:push`, `test:harness`) → **playwright** matrix `api`/`ui` (install browsers only for ui, `CI=true`, upload the HTML report always) → **alert** that opens or updates an issue when a *scheduled* run fails. Evals are not in CI: they call a paid agent and are slow, so they run on demand.
+**Build** `.github/workflows/tests.yml`: triggers on `pull_request`, `push` to `main`, a weekday `schedule`, and `workflow_dispatch`. Jobs: **validate** (`npm ci`, `validate:push`, `test:harness`) → **playwright** matrix `api`/`ui` (install browsers only for ui, `CI=true`, upload the HTML report always). Evals are not in CI: they call a paid agent and are slow, so they run on demand.
 
 *Acceptance:* a PR with a deliberately broken assertion goes red and its report is downloadable; a manual `workflow_dispatch` run is green.
 

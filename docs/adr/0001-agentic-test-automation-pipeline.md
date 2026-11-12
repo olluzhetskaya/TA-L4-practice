@@ -35,7 +35,7 @@ We will build a staged pipeline. Each stage is an agent skill that writes one ar
 | 3 | Specs (`create-api-spec`, `create-ui-spec`) | Stage 2 artifact | Playwright specs + POM / API client / data / fixtures | eslint, ast-grep rules, traceability (title = test case title, `testCase('TC-n')`, step naming), typecheck |
 | 4 | Run | Specs | Green run against the live system | Playwright exit code |
 | 5 | Pull request | Branch | PR | Pre-push hook runs `validate:push` |
-| 6 | CI | PR, schedule | Green suite or an alert | Same gates + Playwright (api, ui) |
+| 6 | CI | PR, schedule | Green suite | Same gates + Playwright (api, ui) |
 
 Design rules that apply to every stage:
 
@@ -50,7 +50,7 @@ Hooks and automation:
 
 - `.cursor/hooks.json` → `stop`: run the gates for files changed in the session; non-empty failures become a `followup_message` (bounded by `loop_limit`).
 - `.cursor/hooks.json` → `beforeShellExecution` matching `git push|gh pr create`: run `npm run validate:push`; deny with the failure text if it is red.
-- `.github/workflows/tests.yml`: on pull request, push to `main`, and a weekday schedule — validate, then api and ui projects in parallel with reports as artifacts; a failed scheduled run opens or updates an issue.
+- `.github/workflows/tests.yml`: on pull request, push to `main`, and a weekday schedule — validate, then api and ui projects in parallel with reports as artifacts.
 
 Evals (optional): a dataset of tickets with golden outputs (a finished Playwright spec per level and the golden artifact). A task stages a workspace, lets the agent run one skill, and grades the output with the same gates plus parity against the golden facts. Goldens are verified against the live system before they are used.
 
@@ -66,4 +66,4 @@ Evals (optional): a dataset of tickets with golden outputs (a finished Playwrigh
 
 - Each gate has a failing and a passing fixture in the harness tests.
 - Golden specs pass all gates and run green; an agent run for the same ticket passes the same gates (eval pass rate).
-- A scheduled CI run stays green for a week; failures open an issue within one run.
+- A scheduled CI run stays green for a week; a red run is visible in the Actions tab.

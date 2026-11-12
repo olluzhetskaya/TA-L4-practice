@@ -1,6 +1,6 @@
 ---
 name: github-ci
-description: Open a pull request with gh and keep the GitHub Actions workflow for the Playwright suite correct — triggers, validate job, api/ui matrix, artifacts, scheduled-failure alert. Use when raising a PR, wiring CI, or when CI is red.
+description: Open a pull request with gh and keep the GitHub Actions workflow for the Playwright suite correct — triggers, validate job, api/ui matrix, artifacts. Use when raising a PR, wiring CI, or when CI is red.
 ---
 
 # github-ci
@@ -31,7 +31,6 @@ PR body: test case ids automated, findings and how they were handled, any `test.
 - Triggers: `pull_request`, `push` to `main`, weekday `schedule`, `workflow_dispatch`; `concurrency` cancels superseded runs; `permissions: contents: read`.
 - `validate`: `npm ci`, `npm run validate:push`, `npm run test:harness`.
 - `playwright`: `needs: validate`, matrix `[api, ui]`, `CI=true` (retries 2, 2 workers), browsers installed only for `ui`, HTML report uploaded with `if: always()`.
-- `alert-on-scheduled-failure`: runs only when `github.event_name == 'schedule'` and a job failed; opens or comments on one issue titled "Scheduled test run is red" (needs `issues: write`).
 
 ## When CI is red
 
