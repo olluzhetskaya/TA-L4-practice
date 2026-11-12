@@ -4,13 +4,16 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import { DIRS } from '../../harness-config.ts'
-import { reviewInputFile } from './review-input-files.ts'
+import { hasFailure } from '../../lib/gates/gateResults.ts'
+import { reviewInput } from './input-gates.ts'
 
 let root = ''
 const tcFile = () => join(root, `${DIRS.testCases}/TOOL-1.json`)
 const readTc = () => JSON.parse(readFileSync(tcFile(), 'utf8'))
 const writeTc = (data: unknown) => writeFileSync(tcFile(), JSON.stringify(data))
-const gate = (name: string) => reviewInputFile(tcFile(), { root }).gates.find(g => g.gate === name)
+const review = () => reviewInput(root, 'TOOL-1')
+const passes = () => !hasFailure(review().gates)
+const gate = (name: string) => review().gates.find(g => g.gate === name)
 
 beforeEach(() => {
   root = mkdtempSync(join(tmpdir(), 'input-hook-'))
@@ -23,9 +26,9 @@ beforeEach(() => {
 })
 afterEach(() => rmSync(root, { recursive: true, force: true }))
 
-describe('input hook', () => {
+describe('input gates', () => {
   it('accepts the TOOL-1 inputs', () => {
-    assert.equal(reviewInputFile(tcFile(), { root }).decision, 'continue')
+    assert.ok(passes())
   })
 
   it('fails on invalid JSON', () => {
@@ -58,7 +61,7 @@ describe('input hook', () => {
     const data = readTc()
     data.issues[0].fields.customfield_10004.steps.reverse()
     writeTc(data)
-    assert.equal(reviewInputFile(tcFile(), { root }).decision, 'continue')
+    assert.ok(passes())
   })
 
   it('fails on duplicate test case ids', () => {
@@ -91,8 +94,7 @@ describe('input hook', () => {
 
   it('treats the story as optional (warn)', () => {
     rmSync(join(root, `${DIRS.stories}/TOOL-1.md`))
-    const result = reviewInputFile(tcFile(), { root })
-    assert.equal(result.decision, 'continue')
+    assert.ok(passes())
     assert.equal(gate('story')?.status, 'warn')
   })
 

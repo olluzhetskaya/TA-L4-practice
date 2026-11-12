@@ -1,6 +1,6 @@
 ---
 name: pom-builder
-description: Create or change a page object in src/pages/ — locator getters, user operations, no assertions. Use when the analyse-sut artifact's pomPlan lists a page to create, or when a spec needs a new interaction.
+description: Create or change a page object in src/pages/ — locator getters, user operations, no assertions. Use when a generated UI spec needs a new page or interaction.
 ---
 
 # pom-builder

@@ -26,10 +26,8 @@ jobs:
           node-version: 22
           cache: npm
       - run: npm ci
-      - name: Typecheck, eslint, ast-grep, pipeline gates
-        run: npm run validate:push
-      - name: Harness tests
-        run: npm run test:harness
+      - name: Schemas, typecheck, eslint, ast-grep, pipeline gates, harness tests
+        run: npm run validate
 
   playwright:
     needs: validate

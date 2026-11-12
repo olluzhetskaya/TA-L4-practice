@@ -1,62 +1,110 @@
-import type { TestLevel } from '../input-validation/input-schemas.ts'
+import ts from 'typescript'
 import { FILE_PATTERNS } from '../../harness-config.ts'
+import { testLevelSchema, type TestLevel } from '../input-validation/input-schemas.ts'
 
-const QUOTED = String.raw`(['"\`])((?:\\.|(?!\1).)*)\1`
-const TEST_TITLE = new RegExp(String.raw`\btest\(\s*${QUOTED}`, 'g')
-const STEP_TITLE = new RegExp(String.raw`\btest\.step\(\s*${QUOTED}`, 'g')
-const TC_ANNOTATION = /\btestCase\(\s*['"`](TC-\d+)['"`]\s*\)/g
-
-export type SpecFacts = {
-  titles: string[]
+/** What a spec file declares about one `test(...)`, read from the syntax tree. */
+export type SpecTest = {
+  title: string
+  /** From `annotation: testCase('TC-n')`. */
+  tcId?: string
   stepTitles: string[]
-  tcIds: string[]
-}
-
-const collect = (re: RegExp, text: string, group: number): string[] =>
-  [...text.matchAll(re)].map(m => m[group] ?? '')
-
-/** Light static read of a spec — enough for traceability gates without a TS parser. */
-export function readSpecFacts(source: string): SpecFacts {
-  return {
-    titles: collect(TEST_TITLE, source, 2),
-    stepTitles: collect(STEP_TITLE, source, 2),
-    tcIds: collect(TC_ANNOTATION, source, 1),
-  }
-}
-
-/** Source text of each annotated test: from its `testCase('TC-n')` annotation up to the next annotation. */
-export function readTestBlocks(source: string): Map<string, string> {
-  const marks = [...source.matchAll(TC_ANNOTATION)]
-  return new Map(
-    marks.map((mark, i) => [mark[1] ?? '', source.slice(mark.index ?? 0, marks[i + 1]?.index ?? source.length)]),
-  )
-}
-
-export type BlockFacts = {
+  /** `HttpStatus.X` members referenced in the test body. */
   statuses: string[]
-  assertions: number
+  /** Playwright/Jest matcher names called on `expect(...)`, preserving duplicates. */
+  matchers: string[]
+  /** Names destructured from the Playwright test callback; undefined means the callback did not use fixture injection. */
+  fixtures?: string[]
+  /** The body calls `test.fail(...)`. */
   expectedFailure: boolean
 }
 
-const HTTP_STATUS = /\bHttpStatus\.(\w+)/g
-const ASSERTION = /\bexpect\(/g
-const EXPECTED_FAILURE = /\btest\.fail\(/
-const DISABLED_TEST = /\b(?:test|describe)(?:\.describe)?\.(?:skip|fixme|only)\b/g
+const DISABLED_TEST = /^(?:test|describe|test\.describe)\.(?:skip|fixme|only)$/
+
+const literalText = (node: ts.Node | undefined): string | undefined => {
+  if (node && ts.isStringLiteralLike(node)) return node.text
+  if (node && ts.isTemplateExpression(node)) return node.head.text
+  return undefined
+}
+
+function descendants(root: ts.Node, visit: (node: ts.Node) => void) {
+  const walk = (node: ts.Node) => {
+    visit(node)
+    ts.forEachChild(node, walk)
+  }
+  walk(root)
+}
+
+function expectMatcher(node: ts.CallExpression): string | undefined {
+  if (!ts.isPropertyAccessExpression(node.expression)) return undefined
+  let target: ts.Expression = node.expression.expression
+  while (ts.isPropertyAccessExpression(target)) target = target.expression
+  return ts.isCallExpression(target) && target.expression.getText() === 'expect' ? node.expression.name.text : undefined
+}
+
+function readTest(call: ts.CallExpression, sf: ts.SourceFile): SpecTest {
+  const test: SpecTest = {
+    title: literalText(call.arguments[0]) ?? '',
+    stepTitles: [],
+    statuses: [],
+    matchers: [],
+    expectedFailure: false,
+  }
+  const options = call.arguments[1]
+  if (options && ts.isObjectLiteralExpression(options)) {
+    const annotation = options.properties.find(p => ts.isPropertyAssignment(p) && p.name.getText(sf) === 'annotation')
+    if (annotation)
+      descendants(annotation, node => {
+        if (ts.isCallExpression(node) && node.expression.getText(sf) === 'testCase') test.tcId ??= literalText(node.arguments[0])
+      })
+  }
+  const callback = [...call.arguments].reverse().find(arg => ts.isArrowFunction(arg) || ts.isFunctionExpression(arg))
+  const fixtureParameter = callback?.parameters[0]?.name
+  if (fixtureParameter && ts.isObjectBindingPattern(fixtureParameter))
+    test.fixtures = fixtureParameter.elements.map(element => element.name.getText(sf))
+  descendants(call, node => {
+    if (ts.isCallExpression(node)) {
+      const name = node.expression.getText(sf)
+      if (name === 'test.step') test.stepTitles.push(literalText(node.arguments[0]) ?? '')
+      if (name === 'test.fail') test.expectedFailure = true
+      const matcher = expectMatcher(node)
+      if (matcher) test.matchers.push(matcher)
+    }
+    if (ts.isPropertyAccessExpression(node) && node.expression.getText(sf) === 'HttpStatus' && !test.statuses.includes(node.name.text))
+      test.statuses.push(node.name.text)
+  })
+  return test
+}
+
+const parse = (source: string) => ts.createSourceFile('spec.ts', source, ts.ScriptTarget.Latest, true)
+
+export function readSpecTests(source: string): SpecTest[] {
+  const sf = parse(source)
+  const tests: SpecTest[] = []
+  descendants(sf, node => {
+    if (ts.isCallExpression(node) && node.expression.getText(sf) === 'test' && literalText(node.arguments[0]) !== undefined)
+      tests.push(readTest(node, sf))
+  })
+  return tests
+}
+
+export function readImportSources(source: string): string[] {
+  const sf = parse(source)
+  return sf.statements.flatMap(statement =>
+    ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier) ? [statement.moduleSpecifier.text] : [],
+  )
+}
 
 /** `test.skip`, `test.fixme`, `test.only`, `describe.skip` … — anything that stops a test from running in the suite. */
-export const readDisabledTestMarkers = (source: string): string[] => [...new Set(collect(DISABLED_TEST, source, 0))]
-
-/** What one test asserts that does not depend on how the author named their own helpers. */
-export function readBlockFacts(block: string): BlockFacts {
-  return {
-    statuses: [...new Set(collect(HTTP_STATUS, block, 1))],
-    assertions: collect(ASSERTION, block, 0).length,
-    expectedFailure: EXPECTED_FAILURE.test(block),
-  }
+export function readDisabledTestMarkers(source: string): string[] {
+  const sf = parse(source)
+  const markers = new Set<string>()
+  descendants(sf, node => {
+    if (ts.isPropertyAccessExpression(node) && DISABLED_TEST.test(node.getText(sf))) markers.add(node.getText(sf))
+  })
+  return [...markers]
 }
 
 /** `TOOL-1.contact.api.spec.ts` → 'api'. */
 export function levelFromSpecName(file: string): TestLevel | undefined {
-  const match = FILE_PATTERNS.specLevel.exec(file)
-  return match ? (match[1] as TestLevel) : undefined
+  return testLevelSchema.safeParse(FILE_PATTERNS.specLevel.exec(file)?.[1]).data
 }

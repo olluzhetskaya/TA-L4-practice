@@ -8,7 +8,7 @@ description: Review generated specs, page objects, API clients, and fixtures aga
 Run the gates first — they are the floor, not the review:
 
 ```bash
-npm run runGates -- <changed files>
+npm run validate
 ```
 
 Then read the code for what tools miss. Report **Critical** (must fix), **Warning**, **Info**; fix every Critical before the PR.

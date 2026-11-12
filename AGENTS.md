@@ -1,6 +1,6 @@
 # Coding conventions
 
-Apply to every file in the framework (`src/`, `tests/`) and to the harness (`.agents/`). They are always on — skills do not repeat them. Layer-specific guidance lives in the skills; the rules below are enforced by `npm run validate:push` (typecheck, eslint, ast-grep, pipeline gates).
+Apply to every file in the framework (`src/`, `tests/`) and to the harness (`.agents/`). They are always on — skills do not repeat them. Layer-specific guidance lives in the skills; the rules below are enforced by `npm run validate` (typecheck, eslint, ast-grep, pipeline gates).
 
 ## Never violate
 
@@ -9,7 +9,7 @@ Apply to every file in the framework (`src/`, `tests/`) and to the harness (`.ag
 - **No `console.log`.** Use `test.step()` names for reporting context. (`console.error` / `console.warn` are allowed in harness code.)
 - **No unnecessary comments.** Keep a comment only for an external constraint, a known API gap, or a non-obvious invariant. Delete anything that restates the code or explains the agent's reasoning.
 - **No `eslint-disable`.** Fix the violation, or change the config if the rule is wrong for this codebase.
-- **No deep relative imports.** Use the aliases: `@fixtures`, `@data/*`, `@pages/*`, `@helpers/*`, `@config/*`, `@generated/*`, `@src/*`.
+- **No deep relative imports in `src/` or `tests/`.** Use the aliases: `@fixtures`, `@data/*`, `@pages/*`, `@helpers/*`, `@config/*`, `@generated/*`, `@src/*`. Harness code under `.agents/` may use relative imports.
 - **No string or number literals where an enum or named constant exists.** Statuses → `HttpStatus`; choices → domain enums; limits and copy → records in `src/data/`.
 
 ## Layers
@@ -33,7 +33,7 @@ Apply to every file in the framework (`src/`, `tests/`) and to the harness (`.ag
 ## Before pushing
 
 ```
-npm run validate:push   # typecheck + eslint + ast-grep + pipeline gates
+npm run validate   # schemas + typecheck + eslint + ast-grep + pipeline gates + harness tests
 ```
 
 `.githooks/pre-push` runs the same chain.

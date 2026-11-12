@@ -2,13 +2,14 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { z } from 'zod'
-import { MAX_DETAIL_LINES, TIMEOUTS } from '../../harness-config.ts'
-import { commandGate } from '../../lib/gates/commandGate.ts'
+import { TIMEOUTS } from '../../harness-config.ts'
 import { fail, pass, type GateResult } from '../../lib/gates/gateResults.ts'
+import { commandGate } from './run-command.ts'
 import type { SpecContext } from './spec-context.ts'
 
 const TEST_CASE_ANNOTATION = 'test-case'
 const DETAIL_MAX_CHARS = 200
+const PLAYWRIGHT_DETAIL_LINES = 25
 
 const testSchema = z.object({
   annotations: z.array(z.object({ type: z.string(), description: z.string().optional() })),
@@ -64,14 +65,14 @@ function readReport(file: string): unknown {
 }
 
 /** Run the written specs and report one gate per test case; falls back to the single run gate when no report was produced. */
-export function runSpecGates({ workspace, level, specFiles, testCases }: SpecContext): GateResult[] {
+export function runSpecGates({ workspace, level, specs, testCases }: SpecContext): GateResult[] {
   const reportDir = mkdtempSync(join(tmpdir(), 'pw-report-'))
   try {
     const reportFile = join(reportDir, 'report.json')
-    const run = commandGate('playwright', 'npx', ['--no-install', 'playwright', 'test', `--project=${level}`, '--reporter=json', ...specFiles], {
+    const run = commandGate('playwright', 'npx', ['--no-install', 'playwright', 'test', `--project=${level}`, '--reporter=json', ...specs.map(spec => spec.file)], {
       cwd: workspace,
       timeoutMs: TIMEOUTS.playwright,
-      maxDetailLines: MAX_DETAIL_LINES.playwright,
+      maxLines: PLAYWRIGHT_DETAIL_LINES,
       env: { ...process.env, CI: '', NO_COLOR: '1', PLAYWRIGHT_JSON_OUTPUT_FILE: reportFile },
     })
     const outcomes = readCaseOutcomes(readReport(reportFile))

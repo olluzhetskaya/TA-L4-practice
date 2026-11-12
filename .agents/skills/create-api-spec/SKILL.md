@@ -12,9 +12,9 @@ Automate the `level: "api"` test cases of a ticket. The manual test case defines
 1. `wiki/TEST-STRATEGY.md` — §2 (API owns contracts, rules, boundaries, persistence), §4, §5, §7
 2. `AGENTS.md` — coding conventions (enforced by eslint + ast-grep)
 3. `.agents/manual-to-autotests-pipeline/test-cases/<TICKET>.json` — the api test cases: the Jira/Xray issues whose `fields.components[0].name` is `api` (steps in `fields.customfield_10004.steps[]`)
-4. `.agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json` — `apiCalls`, `scenarios`, `findings` for those test cases
+4. `.agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json` — observed `apiCalls` and `findings` for those test cases
 
-If the artifact is missing or fails `npm run runGates -- .agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json`, stop: run `analyse-sut` first.
+If the artifact is missing or its gates fail in `npm run validate:pipeline <TICKET>`, stop: run `analyse-sut` first.
 
 ## Supporting skills
 
@@ -46,7 +46,7 @@ For each api test case, walk its steps against `findings`:
 
 ### 2. Client, data, fixtures — reuse before creating
 
-- Search `src/helpers/api/` for an existing client method. Add a method only when `apiCalls[].needsClient` or search says none exists; type payloads from `@generated/*`.
+- Search `src/helpers/api/` for an existing client method. Add one only when none exists; type payloads from `@generated/*`.
 - Payload builders, enums, constants, and Zod response schemas live in `src/data/`. No literals for statuses, subjects, limits, or messages in the spec — use `HttpStatus`, domain enums, named constants.
 - Fixtures live in `tests/fixtures/` and are exported through the `@fixtures` barrel. Preconditions (tokens, seeded entities) come from fixtures, never inline in the test body.
 - Every response body is read through `readJson(response, schema)` — never `as SomeType`.
@@ -73,7 +73,7 @@ test(
 Rules:
 
 - Title is the test case title, character for character. One `test()` per test case.
-- Steps are named `Verify that …` / `Confirm that …` — business outcome, not endpoint path.
+- Use one step per automated manual action. Prefix that action with `Verify that` or `Confirm that`, lowercase only its first letter, and do not paraphrase it.
 - Import only from `@fixtures`. Every `expect()` has a message.
 - When state changes over time, poll with `expect.poll()` / `toPass()`; never sleep.
 - No seeded-internal values in assertions: compare against the fixture's return value or a data record.
@@ -82,13 +82,14 @@ Rules:
 ### 4. Gates and run
 
 ```bash
-npm run runGates -- tests/api/<spec file>        # eslint + ast-grep + traceability
+npx eslint tests/api/<spec file> && npx ast-grep scan --report-style=short tests/api/<spec file>
+npm run validate:pipeline <TICKET>               # traceability and coverage
 npx playwright test --project=api <spec file> --reporter=line
 ```
 
 Fix every finding in the code — never add `eslint-disable`. A failing assertion means: re-probe the endpoint, then either the data is wrong or the test case needs a finding; do not loosen the assertion to make it pass.
 
-The Cursor stop hook runs the spec gates; `git push` / `gh pr create` are blocked until `npm run validate:push` passes.
+The Cursor stop hook runs the spec gates; `git push` is blocked until `npm run validate` passes.
 
 ### 5. Hand off
 

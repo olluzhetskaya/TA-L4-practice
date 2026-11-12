@@ -1,10 +1,10 @@
 import assert from 'node:assert/strict'
 import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
-import { DIRS } from '../../../../harness-config.ts'
-import { testCaseFileSchema } from '../../../../manual-to-autotests-pipeline/input-validation/input-schemas.ts'
-import { explorationSchema, type Exploration } from '../schema.ts'
-import { runGates } from './index.ts'
+import { DIRS } from '../../harness-config.ts'
+import { testCaseFileSchema } from '../input-validation/input-schemas.ts'
+import { explorationSchema, type Exploration } from './schema.ts'
+import { explorationGates as runGates } from './gates.ts'
 
 const testCases = testCaseFileSchema.parse(JSON.parse(readFileSync(`${DIRS.testCases}/TOOL-1.json`, 'utf8')))
 const reference = explorationSchema.parse(JSON.parse(readFileSync(`${DIRS.artifacts}/explore-TOOL-1.json`, 'utf8')))
@@ -30,6 +30,10 @@ describe('analyse-sut gates', () => {
     assert.deepEqual(failing(runGates(testCases, { meta: {} })), ['schema'])
   })
 
+  it('rejects implementation plans outside the evidence contract', () => {
+    assert.deepEqual(failing(runGates(testCases, { ...reference, pomPlan: {} })), ['schema'])
+  })
+
   it('rejects CSS locators', () => {
     const results = mutate(d => {
       at(d.locators, 0).locator = "locator('#first_name')"
@@ -53,21 +57,21 @@ describe('analyse-sut gates', () => {
 
   it('rejects unknown references', () => {
     const results = mutate(d => {
-      at(at(d.scenarios, 2).steps, 0).locatorRef = 'contact.doesNotExist'
+      at(d.locators, 0).tcRef = 'TC-99'
     })
     assert.deepEqual(failing(results), ['references'])
   })
 
-  it('requires a scenario for every test case', () => {
+  it('requires verified locator evidence for every UI test case', () => {
     const results = mutate(d => {
-      d.scenarios = d.scenarios.filter(s => s.tcRef !== 'TC-4')
+      d.locators = d.locators.filter(locator => locator.tcRef !== 'TC-4')
     })
     assert.deepEqual(failing(results), ['coverage'])
   })
 
-  it('requires UI scenarios to use locators and API scenarios to use calls', () => {
+  it('requires observed API evidence for every API test case', () => {
     const results = mutate(d => {
-      for (const step of at(d.scenarios, 0).steps) step.apiCallRef = null
+      d.apiCalls = d.apiCalls.filter(call => call.tcRef !== 'TC-2')
     })
     assert.deepEqual(failing(results), ['coverage'])
   })
@@ -77,14 +81,6 @@ describe('analyse-sut gates', () => {
       at(d.apiCalls, 0).pathPattern = 'https://api.practicesoftwaretesting.com/messages'
     })
     assert.deepEqual(failing(results), ['api-calls'])
-  })
-
-  it('warns, but does not fail, when a typed client is still missing', () => {
-    const results = mutate(d => {
-      at(d.apiCalls, 0).needsClient = true
-    })
-    assert.deepEqual(failing(results), [])
-    assert.equal(results.find(r => r.gate === 'api-calls')?.status, 'warn')
   })
 
   it('requires at least one observed live result per API call', () => {

@@ -7,18 +7,19 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
-    "ast-grep": "bash tools/ast-grep/scan.sh",
-    "validate:push": "npm run schema && npm run typecheck && npm run lint && npm run ast-grep && npm run runGates -- --all --no-lint",
-    "runGates": "tsx .agents/scripts/runGates-cli.ts",
-    "schema": "tsx .agents/manual-to-autotests-pipeline/schema-exports.ts",
+    "ast-grep": "ast-grep scan --report-style=short",
+    "validate:pipeline": "tsx .agents/manual-to-autotests-pipeline/validate.ts",
+    "validate": "npm run schema:check && npm run typecheck && npm run lint && npm run ast-grep && npm run validate:pipeline && npm run test:harness",
+    "schema:update": "tsx .agents/manual-to-autotests-pipeline/schema-exports.ts",
+    "schema:check": "tsx .agents/manual-to-autotests-pipeline/schema-exports.ts --check",
     "generate:types": "openapi-typescript \"${TOOLSHOP_API_URL:-https://api.practicesoftwaretesting.com}/docs\" -o src/types/generated/toolshop-api.d.ts",
     "test": "playwright test",
     "test:api": "playwright test --project=api",
     "test:ui": "playwright test --project=ui",
-    "test:harness": "node --import tsx --test $(find .agents -name '*.test.ts')",
+    "test:harness": "node --import tsx --test \".agents/manual-to-autotests-pipeline/{input-validation,exploration-validation,specs-validation}/**/*.test.ts\" \".agents/manual-to-autotests-pipeline/validate.test.ts\"",
+    "test:eval": "node --import tsx --test \".agents/manual-to-autotests-pipeline/eval/**/*.test.ts\"",
     "eval": "tsx --env-file-if-exists=.env scripts/run-eval.ts",
-    "eval:goldens": "tsx --env-file-if-exists=.env scripts/verify-goldens.ts",
-    "hooks:install": "git config core.hooksPath .githooks"
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "engines": {
     "node": ">=22"

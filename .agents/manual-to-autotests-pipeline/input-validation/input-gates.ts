@@ -1,19 +1,18 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { fail, fixRequired, pass, passFailFromSchema, toCheckResult, warn, type CheckResult, type GateResult } from '../../lib/gates/gateResults.ts'
+import { fail, pass, passFailFromSchema, warn, type GateResult } from '../../lib/gates/gateResults.ts'
 import { readOutputJson } from '../../lib/files.ts'
-import { STRATEGY_FILE, ticketFromFileName } from '../paths.ts'
+import { STRATEGY_FILE, testCasePath } from '../paths.ts'
 import { testCaseFileSchema, type StoryContext, type TestCaseFile } from './input-schemas.ts'
 import { VALIDATION } from '../../harness-config.ts'
 import { loadStory, type StoryLoad } from './load-story.ts'
 
 const VAGUE_EXPECTED = /^(works?|ok|okay|correct(ly)?|success(ful(ly)?)?|as expected|fine|passes?)\.?$/i
 
-function ticketGate(file: string, data: TestCaseFile): GateResult {
-  const fromName = ticketFromFileName(file)
-  return fromName === data.ticket
+function ticketGate(ticket: string, data: TestCaseFile): GateResult {
+  return ticket === data.ticket
     ? pass('ticket-match')
-    : fail('ticket-match', `file name says ${fromName ?? '(none)'} but "ticket" is ${data.ticket}`)
+    : fail('ticket-match', `file name says ${ticket} but "ticket" is ${data.ticket}`)
 }
 
 function storyGate(load: StoryLoad): GateResult {
@@ -57,25 +56,28 @@ function strategyGate(root: string): GateResult {
     : fail('strategy', `${STRATEGY_FILE} is missing — the pipeline must read the test strategy before analysing the SUT`)
 }
 
-/** Input hook: validate `.agents/manual-to-autotests-pipeline/test-cases/<TICKET>.json` (+ optional story) before the pipeline starts. */
-export function reviewInputFile(file: string, opts: { root?: string } = {}): CheckResult {
-  const root = opts.root ?? process.cwd()
-  const ticket = ticketFromFileName(file)
-  const parsed = readOutputJson(file)
-  if (!parsed.ok) return fixRequired(file, ticket, fail('schema', parsed.detail))
+export type InputReview = { gates: GateResult[]; testCases?: TestCaseFile }
+
+/** Validate `test-cases/<TICKET>.json` and its optional story before the pipeline starts. */
+export function reviewInput(root: string, ticket: string): InputReview {
+  const parsed = readOutputJson(join(root, testCasePath(ticket)))
+  if (!parsed.ok) return { gates: [fail('schema', parsed.detail)] }
 
   const { result, value } = passFailFromSchema(testCaseFileSchema, parsed.raw)
-  if (!value) return fixRequired(file, ticket, result)
+  if (!value) return { gates: [result] }
 
   const load = loadStory(root, value.ticket)
   const story = load.status === 'ok' ? load.story : undefined
-  return toCheckResult(file, value.ticket, [
-    result,
-    ticketGate(file, value),
-    storyGate(load),
-    acRefsGate(value, story),
-    concreteExpectedGate(value),
-    levelCoverageGate(value),
-    strategyGate(root),
-  ])
+  return {
+    testCases: value,
+    gates: [
+      result,
+      ticketGate(ticket, value),
+      storyGate(load),
+      acRefsGate(value, story),
+      concreteExpectedGate(value),
+      levelCoverageGate(value),
+      strategyGate(root),
+    ],
+  }
 }

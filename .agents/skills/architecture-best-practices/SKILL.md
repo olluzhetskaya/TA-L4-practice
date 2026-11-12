@@ -24,7 +24,7 @@ Dependency direction: spec → fixtures → page objects / API clients → data,
 - **Composition over inheritance.** Only `BasePage` / `BaseApi` are base classes. A page that needs a region composes a component.
 - **Dependency injection through fixtures.** Classes receive `Page` / `APIRequestContext` / token in the constructor; they never read globals or create their own context.
 - **One reason to change.** If a class mixes DOM, data, and assertions, split it.
-- **Reuse before create.** Search the layer first; the artifact's `pomPlan.reusedFrom` says what was found.
+- **Reuse before create.** Search the target layer before adding a page object, API client, fixture, data record, or helper.
 - **Parsing and calculating is not a page's job.** A pure helper in `src/helpers/` (or the data module) takes values and returns values.
 
 Enforced by: ast-grep `no-request-context-outside-api-helper`, `no-fixture-in-page-object`, `no-goto-in-spec`, `no-page-locator-in-spec`; ESLint `no-restricted-imports`.

@@ -16,7 +16,7 @@ const EXCLUDED = [
   /^test-results(\/|$)/,
   new RegExp(`^${PIPELINE_DIR}/eval(/|$)`),
   /^\.agents\/skills\/[^/]+\/eval(\/|$)/,
-  /^scripts\/(verify-goldens|run-eval)\.ts$/,
+  /^scripts\/run-eval\.ts$/,
 ]
 
 /** True for repo paths that never reach an eval workspace. */

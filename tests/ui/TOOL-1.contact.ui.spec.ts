@@ -2,6 +2,7 @@ import {
   ContactCopy,
   ContactRules,
   ContactSubjectLabel,
+  RequestCount,
   Tag,
   buildContactForm,
   expect,
@@ -16,7 +17,9 @@ test(
   async ({ contactPage }) => {
     const form = buildContactForm()
 
-    await test.step('Verify that the filled form shows the entered values without validation errors', async () => {
+    await test.step(
+      'Verify that fill in first name, last name, email address, choose a subject, and enter a message of at least 50 characters',
+      async () => {
       await contactPage.open()
       await contactPage.fillForm(form)
       await expect(contactPage.getFirstNameInput(), 'First name should hold the entry').toHaveValue(form.firstName)
@@ -26,9 +29,10 @@ test(
         new RegExp(ContactSubjectLabel[form.subject]),
       )
       await expect(contactPage.getMessageInput(), 'Message should hold the entry').toHaveValue(form.message)
-    })
+      },
+    )
 
-    await test.step('Confirm that sending the form shows the confirmation', async () => {
+    await test.step('Confirm that send the form', async () => {
       await contactPage.submit()
       await expect(contactPage.getAlert(ContactCopy.confirmation), 'Confirmation should replace the form').toBeVisible()
     })
@@ -42,18 +46,21 @@ test(
     await contactPage.open()
     const submissions = contactPage.trackSubmissions()
 
-    await test.step('Verify that the empty form shows a required error for every field and sends nothing', async () => {
+    await test.step('Verify that send the empty form', async () => {
       await contactPage.submit()
       for (const text of ContactCopy.requiredErrors)
         await expect(contactPage.getAlert(text), `"${text}" should be displayed`).toBeVisible()
-      expect(submissions.count(), 'No request should be sent for an empty form').toBe(0)
+      expect(submissions.count(), 'No request should be sent for an empty form').toBe(RequestCount.None)
     })
 
-    await test.step('Confirm that a message below the minimum length is rejected on the form and sends nothing', async () => {
+    await test.step(
+      'Confirm that fill every field but enter a message of 49 characters, then send the form',
+      async () => {
       await contactPage.fillForm(buildContactForm({ message: textOfLength(ContactRules.belowFormMinLength) }))
       await contactPage.submit()
       await expect(contactPage.getAlert(ContactCopy.messageTooShort), 'Minimum-length error should be displayed').toBeVisible()
-      expect(submissions.count(), 'No request should be sent for a too-short message').toBe(0)
-    })
+        expect(submissions.count(), 'No request should be sent for a too-short message').toBe(RequestCount.None)
+      },
+    )
   },
 )

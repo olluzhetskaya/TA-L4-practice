@@ -21,7 +21,6 @@ test('flat', async ({ page }) => {
 })
 `
 const BAD_PAGE = `
-import { X } from '../../data/x'
 export class P { run() { test.step('a', async () => { await 1 }); return loc.nth(0) } }
 `
 const BAD_HELPER = `const url = 'https://api.example.org/x'\nconst t = { timeout: 5000 }\nfoo().then(() => 1)\n`
@@ -59,7 +58,6 @@ describe('ast-grep rules', () => {
       'no-manual-sleep',
       'no-empty-test-step',
       'prefer-test-step',
-      'no-deep-relative-import',
       'no-fixture-in-page-object',
       'no-nth-zero',
       'no-hardcoded-url-in-api',

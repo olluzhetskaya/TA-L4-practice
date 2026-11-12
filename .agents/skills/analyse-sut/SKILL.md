@@ -1,6 +1,6 @@
 ---
 name: analyse-sut
-description: Walk the live system under test for one ticket and write the exploration artifact (semantic locators, real network contract, scenarios, findings) that the spec skills build on. Use when manual test cases need to be automated and nothing is known yet about the live UI or API. Do not use to write specs or page objects.
+description: Walk the live system under test for one ticket and write the exploration artifact (verified semantic locators, observed network/API calls, and findings) that the spec skills build on. Use when manual test cases need to be automated and nothing is known yet about the live UI or API. Do not use to write specs or page objects.
 ---
 
 # analyse-sut
@@ -32,7 +32,7 @@ One file: `.agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json`
 
 ### 1. Read the strategy and the test cases
 
-Note each test case's `level`. API cases need the network contract; UI cases need locators and observable outcomes. Every test case needs at least one scenario at its own level.
+Note each test case's `level`. Every API case needs an observed API call and every UI case needs at least one verified locator.
 
 ### 2. Resolve URLs and auth
 
@@ -68,10 +68,9 @@ For each UI test case step:
 1. Locate the element with the first tier that gives exactly one match: `getByRole` → `getByLabel` → `getByText` / `getByPlaceholder` → a scoped version of those. Never CSS, XPath, or `nth`.
 2. Perform the action (`fill`, `select`, `click`) and record it in `verifiedBy`; use `snapshot` for elements you only read and `assert` for outcomes you observed.
 3. Record the **rendered** text in `uiLabel` — product copy often differs from the test case wording (`tcAction`) and from the label (an error can say "Email" while the label says "Email address").
-4. Record dialogs: `opensModal` + `modalDismiss`; a confirm button that starts disabled: `buttonState`.
-5. Run `playwright-cli network` after actions that should (or should not) call the server. "Nothing was sent" must be **seen** in the network log, not assumed. Ignore third-party noise (analytics, challenge scripts).
+4. Run `playwright-cli network` after actions that should (or should not) call the server. "Nothing was sent" must be **seen** in the network log, not assumed. Ignore third-party noise (analytics, challenge scripts).
 
-Keep the session's state clean between scenarios: reload instead of reusing a half-filled form.
+Keep the session's state clean between test cases: reload instead of reusing a half-filled form.
 
 ### 5. Findings
 
@@ -84,10 +83,10 @@ Whenever the live SUT differs from a test case step, add a `findings[]` entry wi
 ### 6. Write the artifact and run the gate
 
 ```bash
-npm run runGates -- .agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json
+npm run validate:pipeline -- --progress <TICKET>
 ```
 
-Fix every failing gate and re-run. The Cursor stop hook runs the same gate.
+Fix every failing input and exploration gate and re-run. `--progress` is for this intermediate stage; the Cursor stop hook and `validate` require the complete ticket, including specs.
 
 ### 7. Close the session
 
@@ -95,12 +94,11 @@ Fix every failing gate and re-run. The Cursor stop hook runs the same gate.
 playwright-cli -s=explore-<TICKET> close
 ```
 
-Report: artifact path, locator count, scenario count, finding count, and any `needsClient: true` API call (a new typed client method is needed before the spec).
+Report the artifact path and the locator, API-call, and finding counts.
 
 ## Rules
 
 - Semantic locators only; every `locator` is a real `getBy*` expression you probed.
 - `uiLabel` ≠ `tcAction`.
 - `apiCalls[].observed` comes from real requests; `pathPattern` is a path (no host).
-- Scenarios reference locators and API calls by id; steps are numbered `1..n`.
 - Do not write specs, page objects, or fixtures in this stage.

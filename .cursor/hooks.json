@@ -3,7 +3,7 @@
   "hooks": {
     "stop": [
       {
-        "command": "node --import tsx .agents/scripts/runGates-cli.ts --hook",
+        "command": "node --import tsx .agents/manual-to-autotests-pipeline/validate.ts --hook",
         "loop_limit": 3
       }
     ]

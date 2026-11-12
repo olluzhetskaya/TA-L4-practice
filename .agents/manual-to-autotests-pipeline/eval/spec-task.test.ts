@@ -2,13 +2,14 @@ import assert from 'node:assert/strict'
 import { appendFileSync, existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, it } from 'node:test'
-import type { AgentRunner } from '../../lib/eval/cursor-runner.ts'
 import { DIRS } from '../../harness-config.ts'
 import { artifactPath, testCasePath } from '../paths.ts'
 import { goldenSpecs, loadEvalItems, type EvalItem } from './dataset.ts'
+import type { AgentRunner } from './cursor-runner.ts'
 import { goldenAgent } from './golden-agent.ts'
 import { buildWorkspace } from './workspace.ts'
-import { gradeTask, runSpecTask, tasksFor, type SpecTask } from './spec-task.ts'
+import { gradeSpecs } from './grade.ts'
+import { runSpecTask, tasksFor, type SpecTask } from './spec-task.ts'
 
 const repoRoot = process.cwd()
 const items = loadEvalItems(repoRoot)
@@ -96,7 +97,7 @@ describe('grading', () => {
   it('accepts golden outputs for every task', async () => {
     for (const task of tasksFor(items)) {
       const outcome = await runSpecTask(task, { repoRoot, agent: goldenAgent(task) })
-      const failures = outcome.checks.filter(g => g.status === 'fail')
+      const failures = outcome.gates.filter(g => g.status === 'fail')
       assert.deepEqual(failures, [], `${task.item.ticket} ${task.level}`)
     }
   })
@@ -105,7 +106,7 @@ describe('grading', () => {
     const { task, ws } = goldenWorkspace()
     try {
       editGoldenSpec(task, ws, source => source.split('\n').filter(line => !line.includes('test.fail(')).join('\n'))
-      assert.ok(gradeTask(task, ws, { repoRoot }).some(g => g.gate === 'bug-marking' && g.status === 'fail'))
+      assert.ok(gradeSpecs(task.item, task.level, ws, { repoRoot }).some(g => g.gate === 'bug-marking' && g.status === 'fail'))
     } finally {
       rmSync(ws, { recursive: true, force: true })
     }
@@ -116,7 +117,7 @@ describe('grading', () => {
     try {
       appendFileSync(join(ws, 'playwright.config.ts'), '\n')
       rmSync(join(ws, 'tests/api/TOOL-1.contact.api.spec.ts'))
-      const gate = gradeTask(task, ws, { repoRoot }).find(g => g.gate === 'protected-files')
+      const gate = gradeSpecs(task.item, task.level, ws, { repoRoot }).find(g => g.gate === 'protected-files')
       assert.equal(gate?.status, 'fail')
       assert.match(gate?.detail ?? '', /playwright\.config\.ts was modified/)
       assert.match(gate?.detail ?? '', /TOOL-1\.contact\.api\.spec\.ts was deleted/)
@@ -129,7 +130,7 @@ describe('grading', () => {
     const { task, ws } = goldenWorkspace()
     try {
       appendFileSync(join(ws, testCasePath(task.item.ticket)), '\n')
-      const gate = gradeTask(task, ws, { repoRoot }).find(g => g.gate === 'protected-files')
+      const gate = gradeSpecs(task.item, task.level, ws, { repoRoot }).find(g => g.gate === 'protected-files')
       assert.match(gate?.detail ?? '', /TOOL-2\.json was modified/)
     } finally {
       rmSync(ws, { recursive: true, force: true })
@@ -142,6 +143,6 @@ describe('grading', () => {
     const judgeAgent: AgentRunner = async () => '[{"id":"TC-1","pass":false,"reason":"weak"},{"id":"TC-2","pass":false,"reason":"weak"},{"id":"TC-3","pass":false,"reason":"weak"}]'
     const outcome = await runSpecTask(task, { repoRoot, agent: goldenAgent(task), judge: { agent: judgeAgent } })
     assert.equal(outcome.passed, true)
-    assert.deepEqual(outcome.judgement.filter(c => c.status === 'fail').map(c => c.name), ['judge:TC-1', 'judge:TC-2', 'judge:TC-3'])
+    assert.deepEqual(outcome.judgement.filter(g => g.status === 'fail').map(g => g.gate), ['judge:TC-1', 'judge:TC-2', 'judge:TC-3'])
   })
 })

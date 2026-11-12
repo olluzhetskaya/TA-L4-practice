@@ -37,6 +37,21 @@ export const ContactFieldLabel = {
   message: 'Message',
 } as const
 
+export enum ContactField {
+  Name = 'name',
+  Email = 'email',
+  Subject = 'subject',
+  Message = 'message',
+}
+
+export const InvalidContactData = {
+  malformedEmail: 'not-an-email',
+} as const
+
+export enum RequestCount {
+  None = 0,
+}
+
 export type ContactFormInput = {
   firstName: string
   lastName: string
@@ -96,4 +111,4 @@ export const contactMessageSchema = z.object({
 
 export const storedMessageSchema = contactMessageSchema.extend({ user_id: z.string().min(1) })
 
-export const validationErrorsSchema = z.record(z.string(), z.array(z.string()))
+export const validationErrorFor = (field: ContactField) => z.object({ [field]: z.array(z.string()).min(1) })

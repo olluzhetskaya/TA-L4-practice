@@ -12,7 +12,7 @@ Automate the `level: "ui"` test cases of a ticket. Locators come from the explor
 1. `wiki/TEST-STRATEGY.md` — §2 (UI owns what the user sees and client-side rules), §3, §4 (API as setup), §7
 2. `AGENTS.md` — coding conventions (enforced by eslint + ast-grep)
 3. `.agents/manual-to-autotests-pipeline/test-cases/<TICKET>.json` — the ui test cases: the Jira/Xray issues whose `fields.components[0].name` is `ui` (steps in `fields.customfield_10004.steps[]`)
-4. `.agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json` — `locators`, `scenarios`, `findings`, `pomPlan`
+4. `.agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json` — verified `locators`, observed `apiCalls`, and `findings`
 
 If the artifact is missing or fails its gate, stop: run `analyse-sut` first.
 
@@ -36,7 +36,7 @@ Read each one when its step comes up — they hold the rules this skill only nam
 
 ### 1. Page object — user operations, not DOM actions
 
-Plan from `pomPlan.pages`; reuse an existing page object when one covers the page.
+Search `src/pages/` first and reuse an existing page object when one covers the page.
 
 - Layers: locator getters (public `Locator`-returning methods) → user operations (`fillForm`, `submit`, `open`) → nothing else.
 - Locators are copied from the artifact (`locators[].locator`); they are semantic, never CSS.
@@ -72,7 +72,7 @@ test(
 Rules:
 
 - Title is the test case title, character for character. One `test()` per test case.
-- Steps are named `Verify that …` / `Confirm that …`.
+- Use one step per automated manual action. Prefix that action with `Verify that` or `Confirm that`, lowercase only its first letter, and do not paraphrase it.
 - Only auto-retrying assertions on locators (`toBeVisible`, `toHaveText`, `toHaveValue`); never `textContent()` then compare.
 - The spec calls page-object getters inline inside `expect()` — it never holds a raw `Locator` and never builds one (`page.getBy…`, `page.locator` are banned in specs).
 - Every `expect()` has a message. Use `.toBeHidden()` rather than `.not.toBeVisible()`.
@@ -81,7 +81,8 @@ Rules:
 ### 4. Gates and run
 
 ```bash
-npm run runGates -- tests/ui/<spec file>         # eslint + ast-grep + traceability
+npx eslint tests/ui/<spec file> && npx ast-grep scan --report-style=short tests/ui/<spec file>
+npm run validate:pipeline <TICKET>               # traceability and coverage
 npx playwright test --project=ui <spec file> --reporter=line
 ```
 

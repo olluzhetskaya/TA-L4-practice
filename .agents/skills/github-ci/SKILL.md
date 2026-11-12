@@ -8,11 +8,11 @@ description: Open a pull request with gh and keep the GitHub Actions workflow fo
 ## Before pushing
 
 ```bash
-npm run validate:push     # typecheck + lint + ast-grep + pipeline gates
+npm run validate          # schemas, typecheck, lint, ast-grep, pipeline gates, harness tests
 npm run test:api && npm run test:ui
 ```
 
-The git pre-push hook runs `validate:push` and blocks the push when it is red. Fix the code; never `--no-verify` or add `eslint-disable`.
+The git pre-push hook (activated by `npm install`) runs `validate` and blocks the push when it is red. Fix the code; never `--no-verify` or add `eslint-disable`.
 
 ## Raise the PR
 
@@ -29,7 +29,7 @@ PR body: test case ids automated, findings and how they were handled, any `test.
 ## Workflow `.github/workflows/tests.yml`
 
 - Triggers: `pull_request`, `push` to `main`, weekday `schedule`, `workflow_dispatch`; `concurrency` cancels superseded runs; `permissions: contents: read`.
-- `validate`: `npm ci`, `npm run validate:push`, `npm run test:harness`.
+- `validate`: `npm ci`, `npm run validate` (the same command as the pre-push hook).
 - `playwright`: `needs: validate`, matrix `[api, ui]`, `CI=true` (retries 2, 2 workers), browsers installed only for `ui`, HTML report uploaded with `if: always()`.
 
 ## When CI is red
