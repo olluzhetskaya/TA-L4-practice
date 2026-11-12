@@ -27,10 +27,7 @@
               "outward": "tests"
             },
             "outwardIssue": {
-              "key": "TOOL-2",
-              "fields": {
-                "summary": "Contact service enforces field length limits"
-              }
+              "key": "TOOL-2"
             }
           },
           {
@@ -88,10 +85,7 @@
               "outward": "tests"
             },
             "outwardIssue": {
-              "key": "TOOL-2",
-              "fields": {
-                "summary": "Contact service enforces field length limits"
-              }
+              "key": "TOOL-2"
             }
           },
           {
@@ -150,10 +144,7 @@
               "outward": "tests"
             },
             "outwardIssue": {
-              "key": "TOOL-2",
-              "fields": {
-                "summary": "Contact service enforces field length limits"
-              }
+              "key": "TOOL-2"
             }
           },
           {

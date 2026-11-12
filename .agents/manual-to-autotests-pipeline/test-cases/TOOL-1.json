@@ -30,10 +30,7 @@
               "outward": "tests"
             },
             "outwardIssue": {
-              "key": "TOOL-1",
-              "fields": {
-                "summary": "Contact customer service from the storefront"
-              }
+              "key": "TOOL-1"
             }
           },
           {
@@ -123,10 +120,7 @@
               "outward": "tests"
             },
             "outwardIssue": {
-              "key": "TOOL-1",
-              "fields": {
-                "summary": "Contact customer service from the storefront"
-              }
+              "key": "TOOL-1"
             }
           },
           {
@@ -192,10 +186,7 @@
               "outward": "tests"
             },
             "outwardIssue": {
-              "key": "TOOL-1",
-              "fields": {
-                "summary": "Contact customer service from the storefront"
-              }
+              "key": "TOOL-1"
             }
           },
           {
@@ -275,10 +266,7 @@
               "outward": "tests"
             },
             "outwardIssue": {
-              "key": "TOOL-1",
-              "fields": {
-                "summary": "Contact customer service from the storefront"
-              }
+              "key": "TOOL-1"
             }
           },
           {

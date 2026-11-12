@@ -27,10 +27,7 @@
               "outward": "tests"
             },
             "outwardIssue": {
-              "key": "TOOL-3",
-              "fields": {
-                "summary": "Search products by keyword"
-              }
+              "key": "TOOL-3"
             }
           },
           {
@@ -96,10 +93,7 @@
               "outward": "tests"
             },
             "outwardIssue": {
-              "key": "TOOL-3",
-              "fields": {
-                "summary": "Search products by keyword"
-              }
+              "key": "TOOL-3"
             }
           },
           {

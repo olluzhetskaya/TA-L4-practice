@@ -121,7 +121,7 @@ The full folder map is under [Layout](#layout).
     "components": [{ "name": "api" }],
     "labels": ["AC-4", "AC-5", "AC-6", "AC-2"],
     "issuelinks": [
-      { "type": { "name": "Test" }, "outwardIssue": { "key": "TOOL-1", "fields": { "summary": "Contact customer service from the storefront" } } },
+      { "type": { "name": "Test" }, "outwardIssue": { "key": "TOOL-1" } },
       { "type": { "name": "Precondition" }, "inwardIssue": { "key": "PRE-1", "fields": { "summary": "The contact endpoint POST /messages is reachable without authentication" } } }
     ],
     "customfield_10004": {
@@ -140,7 +140,7 @@ The full folder map is under [Layout](#layout).
 }
 ```
 
-The test's own `summary` is its **objective** (`Verify that …`, `Confirm that …`), written as a SMART goal: one specific subject, a measurable outcome, small enough for one test. It is also the test's title, so it appears in every report. (The `summary` inside the story link is only the story's title.)
+The test's own `summary` is its **objective** (`Verify that …`, `Confirm that …`), written as a SMART goal: one specific subject, a measurable outcome, small enough for one test. It is also the test's title, so it appears in every report. The links carry no objective: the `Test` link names the story by key, and a `Precondition` link carries the precondition's text.
 
 | | Summary | Why |
 |---|---|---|

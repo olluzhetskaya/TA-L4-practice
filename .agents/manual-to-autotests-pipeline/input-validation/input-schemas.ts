@@ -81,15 +81,12 @@ const xrayStepSchema = z.object({
   }),
 })
 
-const linkedIssueSchema = z.object({
-  key: z.string().min(1),
-  fields: z.object({ summary: z.string().min(1) }),
-})
-
 const issueLinkSchema = z.object({
   type: z.object({ name: z.string() }),
-  outwardIssue: linkedIssueSchema.optional(),
-  inwardIssue: linkedIssueSchema.optional(),
+  /** The story the test belongs to: only its key is used. */
+  outwardIssue: z.object({ key: z.string().min(1) }).optional(),
+  /** A precondition issue: its summary is the precondition text. */
+  inwardIssue: z.object({ key: z.string().min(1), fields: z.object({ summary: z.string().min(1) }) }).optional(),
 })
 type IssueLink = z.infer<typeof issueLinkSchema>
 
