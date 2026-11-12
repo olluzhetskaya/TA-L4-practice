@@ -22,7 +22,6 @@ import type { TestCaseFile } from './input-validation/input-schemas.ts'
 import { artifactPath, ticketFromFileName } from './paths.ts'
 import {
   coverageGate,
-  fixtureBoundaryGate,
   manualStepNamesGate,
   stepNamesGate,
   traceGate,
@@ -52,15 +51,14 @@ const specGates = (root: string, files: string[], testCases: TestCaseFile, compl
   if (files.length === 0) return complete ? [fail('specs', `no spec file for ${testCases.ticket} under tests/`)] : []
   const perFile = files.map(file => {
     const source = readFileSync(join(root, file), 'utf8')
-    return { file, source, tests: readSpecTests(source) }
+    return { file, tests: readSpecTests(source) }
   })
   return [
-    ...perFile.flatMap(({ file, source, tests }) =>
+    ...perFile.flatMap(({ file, tests }) =>
       [
         traceGate(file, tests, testCases),
         stepNamesGate(tests),
         manualStepNamesGate(tests, testCases),
-        fixtureBoundaryGate(source, tests),
       ].map(g => ({ ...g, gate: `${file}: ${g.gate}` })),
     ),
     ...(complete ? [coverageGate(perFile.flatMap(item => item.tests), testCases)] : []),

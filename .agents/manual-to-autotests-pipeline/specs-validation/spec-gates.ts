@@ -1,6 +1,6 @@
 import { fail, gateFromProblems, pass, type GateResult } from '../../lib/gates/gateResults.ts'
 import type { TestCaseFile } from '../input-validation/input-schemas.ts'
-import { levelFromSpecName, readImportSources, type SpecTest } from './spec-source.ts'
+import { levelFromSpecName, type SpecTest } from './spec-source.ts'
 
 const STEP_PREFIX = /^(Verify|Confirm) that /
 const MAX_PROBLEMS = 4
@@ -46,16 +46,6 @@ export function manualStepNamesGate(tests: SpecTest[], testCases: TestCaseFile):
       .map(title => `${test.tcId} step is not a manual action: ${JSON.stringify(title)}`)
   })
   return gateFromProblems('manual-step-names', problems.slice(0, MAX_PROBLEMS))
-}
-
-/** Specs import only the fixture barrel and receive framework objects through the Playwright fixture callback. */
-export function fixtureBoundaryGate(source: string, tests: SpecTest[]): GateResult {
-  const imports = readImportSources(source).filter(module => module !== '@fixtures').map(module => `imports ${JSON.stringify(module)}`)
-  const callbacks = tests.flatMap(test => {
-    if (!test.fixtures?.length) return [`${JSON.stringify(test.title)} does not destructure injected fixtures`]
-    return test.fixtures.filter(name => name === 'page' || name === 'request').map(name => `${JSON.stringify(test.title)} injects raw ${name}`)
-  })
-  return gateFromProblems('fixture-boundaries', [...imports, ...callbacks].slice(0, MAX_PROBLEMS))
 }
 
 /** Every manual test case is automated by exactly one test across all spec files of the ticket. */

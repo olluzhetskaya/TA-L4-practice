@@ -12,8 +12,6 @@ export type SpecTest = {
   statuses: string[]
   /** Playwright/Jest matcher names called on `expect(...)`, preserving duplicates. */
   matchers: string[]
-  /** Names destructured from the Playwright test callback; undefined means the callback did not use fixture injection. */
-  fixtures?: string[]
   /** The body calls `test.fail(...)`. */
   expectedFailure: boolean
 }
@@ -57,10 +55,6 @@ function readTest(call: ts.CallExpression, sf: ts.SourceFile): SpecTest {
         if (ts.isCallExpression(node) && node.expression.getText(sf) === 'testCase') test.tcId ??= literalText(node.arguments[0])
       })
   }
-  const callback = [...call.arguments].reverse().find(arg => ts.isArrowFunction(arg) || ts.isFunctionExpression(arg))
-  const fixtureParameter = callback?.parameters[0]?.name
-  if (fixtureParameter && ts.isObjectBindingPattern(fixtureParameter))
-    test.fixtures = fixtureParameter.elements.map(element => element.name.getText(sf))
   descendants(call, node => {
     if (ts.isCallExpression(node)) {
       const name = node.expression.getText(sf)
@@ -85,13 +79,6 @@ export function readSpecTests(source: string): SpecTest[] {
       tests.push(readTest(node, sf))
   })
   return tests
-}
-
-export function readImportSources(source: string): string[] {
-  const sf = parse(source)
-  return sf.statements.flatMap(statement =>
-    ts.isImportDeclaration(statement) && ts.isStringLiteral(statement.moduleSpecifier) ? [statement.moduleSpecifier.text] : [],
-  )
 }
 
 /** `test.skip`, `test.fixme`, `test.only`, `describe.skip` … — anything that stops a test from running in the suite. */

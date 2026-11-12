@@ -1,0 +1,12 @@
+id: spec-imports-fixture-barrel
+message: "Specs import only from @fixtures; expose data, clients and page objects through the fixture barrel."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.spec.ts
+rule:
+  kind: import_statement
+  not:
+    has:
+      field: source
+      regex: ^['"]@fixtures['"]$

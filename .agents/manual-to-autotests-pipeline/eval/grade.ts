@@ -3,7 +3,6 @@ import { fail, type GateResult } from '../../lib/gates/gateResults.ts'
 import type { TestLevel } from '../input-validation/input-schemas.ts'
 import {
   coverageGate,
-  fixtureBoundaryGate,
   manualStepNamesGate,
   stepNamesGate,
   traceGate,
@@ -29,12 +28,11 @@ export function gradeSpecs(item: EvalItem, level: TestLevel, workspace: string, 
   const run = (gate: string, command: string, args: string[], timeoutMs: number) => commandGate(gate, command, args, { cwd: workspace, timeoutMs })
   const testCases = { ticket: item.ticket, testCases: ctx.testCases }
   return [
-    ...ctx.specs.flatMap(({ file, source, tests }) =>
+    ...ctx.specs.flatMap(({ file, tests }) =>
       [
         traceGate(file, tests, testCases),
         stepNamesGate(tests),
         manualStepNamesGate(tests, testCases),
-        fixtureBoundaryGate(source, tests),
       ].map(g => ({ ...g, gate: `${file}: ${g.gate}` })),
     ),
     coverageGate(ctx.tests, testCases),

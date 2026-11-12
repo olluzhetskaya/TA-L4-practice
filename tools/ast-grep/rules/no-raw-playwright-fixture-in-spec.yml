@@ -1,0 +1,16 @@
+id: no-raw-playwright-fixture-in-spec
+message: "Specs receive page objects and API clients from custom fixtures, not raw page/request fixtures."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.spec.ts
+rule:
+  any:
+    - pattern: async ({ page }) => { $$$BODY }
+    - pattern: async ({ page, $$$REST }) => { $$$BODY }
+    - pattern: async ({ $$$REST, page }) => { $$$BODY }
+    - pattern: async ({ $$$BEFORE, page, $$$AFTER }) => { $$$BODY }
+    - pattern: async ({ request }) => { $$$BODY }
+    - pattern: async ({ request, $$$REST }) => { $$$BODY }
+    - pattern: async ({ $$$REST, request }) => { $$$BODY }
+    - pattern: async ({ $$$BEFORE, request, $$$AFTER }) => { $$$BODY }

@@ -6,6 +6,7 @@ import { describe, it } from 'node:test'
 import { spawnSync } from 'node:child_process'
 
 const BAD_SPEC = `
+import { value } from '@data/contact'
 test('x', async ({ page }) => {
   await page.goto('/contact')
   await page.getByRole('button').click()
@@ -51,6 +52,8 @@ describe('ast-grep rules', () => {
     const expected = [
       'no-goto-in-spec',
       'no-page-locator-in-spec',
+      'no-raw-playwright-fixture-in-spec',
+      'spec-imports-fixture-barrel',
       'no-css-selector-in-spec',
       'expect-needs-message',
       'prefer-api-response-toBeOK',
@@ -68,8 +71,19 @@ describe('ast-grep rules', () => {
     assert.deepEqual(missing, [], output)
   })
 
+  it('flags a raw fixture in any callback position', () => {
+    const source = `
+import { test } from '@fixtures'
+test('x', async ({ contactPage, request, account }) => {
+  await contactPage.open()
+})
+`
+    assert.match(scan({ 'tests/ui/bad.spec.ts': source }), /no-raw-playwright-fixture-in-spec/)
+  })
+
   it('stay quiet on a clean spec', () => {
     const clean = `
+import { expect, test } from '@fixtures'
 test('x', async ({ contactPage }) => {
   await test.step('Verify that a thing', async () => {
     await expect(contactPage.getSendButton(), 'Send should be visible').toBeVisible()

@@ -16,7 +16,7 @@ The whole design is one bet: an agent is excellent at *producing* text and poor 
 - **Deterministic gates.** Every check is code that returns `pass` / `warn` / `fail` the same way every run — reproducible, reviewable, and identical whether you or the agent runs it. "Looks right" is never the bar; a named gate with a message is.
 - **A defined output format between phases.** Analysis doesn't hand the spec phase prose — it writes a Zod-schema'd JSON artifact. A machine-checkable contract means the next phase can rely on it, and a mistake is caught at the boundary instead of surfacing three phases later as a mystery.
 - **Fail loud and early.** Inputs, artifacts, and specs are each validated at their own boundary. A vague `expected`, an invented status, or a dangling AC reference is rejected where it's introduced, so bad data can't silently propagate.
-- **Native tools first, custom code only for domain knowledge.** TypeScript, ESLint, ast-grep and Playwright run directly through npm scripts. The custom domain gates only check relationships those tools cannot know: input validity, live evidence per manual case, traceability, manual-step names, fixture boundaries, and exactly-once coverage. `validate.ts` is their single CLI/hook entry point, not another validation framework.
+- **Native tools first, custom code only for domain knowledge.** TypeScript, ESLint, ast-grep and Playwright run directly through npm scripts. The custom domain gates only check relationships those tools cannot know: input validity, live evidence per manual case, traceability, manual-step names, and exactly-once coverage. `validate.ts` is their single CLI/hook entry point, not another validation framework.
 - **Hooks close the loop automatically.** The stop hook feeds failures back to the agent as a to-do; the pre-push hook runs the same `npm run validate` as CI and blocks a red push. The agent self-corrects without a human in the loop to remember to check — the guardrails run whether or not anyone is watching.
 - **Grounded in the live system, traceable to a test case.** Assertions trace to behaviour actually observed on the SUT (not assumptions), and every spec maps back to a manual test case — nothing is tested that nobody asked for, and nothing asked for is left untested.
 
@@ -85,8 +85,8 @@ Custom code is kept to what native tools cannot know. Everything else is an npm 
 | Analyse skill | the recipe the agent follows | `.agents/skills/analyse-sut/` | 2 |
 | Exploration gates | the artifact schema and five exploration gates | `.agents/manual-to-autotests-pipeline/exploration-validation/` | 2 |
 | Spec skills | `create-api-spec`, `create-ui-spec` | `.agents/skills/create-*-spec/` | 3 |
-| Spec gates | title/ID/level traceability, manual-action step names, fixture boundaries, and one test per test case | `.agents/manual-to-autotests-pipeline/specs-validation/` | 3 |
-| Lint rules | ESLint config + ast-grep rules with their tests | `eslint.config.mjs`, `tools/ast-grep/` | 4 |
+| Spec gates | title/ID/level traceability, manual-action step names, and one test per test case | `.agents/manual-to-autotests-pipeline/specs-validation/` | 3 |
+| Static rules | TypeScript + ESLint + ast-grep, including fixture/import boundaries and Playwright code shapes | `tsconfig.json`, `eslint.config.mjs`, `tools/ast-grep/` | 4 |
 | Hooks | Cursor `stop` hook, git pre-push | `.cursor/hooks.json`, `.githooks/` | 5 |
 | Specs | the generated API and UI specs for `TOOL-1` | `tests/api/`, `tests/ui/` | 6 |
 | CI | `npm run validate`, then the api/ui matrix, with reports | `.github/workflows/tests.yml` | 7 |
@@ -268,16 +268,27 @@ Skill steps: read strategy → resolve auth → walk the UI with `playwright-cli
 
 **Build** two recipes, one for API specs and one for UI specs (`.agents/skills/create-api-spec/`, `.agents/skills/create-ui-spec/`), and the spec gates that check what they produce (`.agents/manual-to-autotests-pipeline/specs-validation/`).
 
-The gates read each spec with the TypeScript compiler API (not regexes), so an annotation always belongs to its own test. eslint, ast-grep and tsc are not wrapped: they run as plain npm scripts (Phase 4).
+The TypeScript compiler API reads each spec, so an annotation belongs to its own test rather than to a nearby string or comment.
 
-- **Traceability per spec file:** title, `testCase('TC-n')` annotation, level from the file name, step names. (`specs-validation/spec-gates.ts`)
-- **Coverage per ticket:** every manual test case is automated by exactly one test across the ticket's spec files, and a ticket with no spec file fails. A skipped test case cannot pass `validate`.
+Checks shared by the normal pipeline and eval:
 
-The normal pipeline and eval share every deterministic check available from the manual input and source: exact manual title and ID, API/UI level, each Playwright step tied to a manual action, exactly-once coverage, `@fixtures`-only imports, and fixture callback injection. Full validation and eval also run ESLint, ast-grep, and TypeScript.
+- **Spec gates:** exact manual title and `TC-n`; API/UI level matches the file; each `test.step` uses a manual action; every manual case has exactly one test.
+- **TypeScript:** imports, fixture types, payloads, clients, and assertions compile.
+- **ESLint:** Playwright rules and TypeScript conventions pass.
+- **ast-grep:** specs import only `@fixtures`; raw `page`/`request` fixtures, locators, navigation, and request calls are rejected; every test has a non-empty step; assertions have messages; status codes, waits, URLs, and timeouts are not inline.
+- **Playwright:** generated specs execute against the configured SUT.
 
-Two stricter checks remain eval-only and are marked as controlled-dataset checks: `no-hardcoded-test-data` rejects every inline payload/expected literal and can be too strict for a general suite; `parity:assertions` compares matcher strength with a golden answer that the normal pipeline does not have. The LLM assertion-quality judge is advisory because semantic verdicts can produce false positives.
+API contract checks:
 
-API contracts have two complementary checks. Generated OpenAPI types type payloads and API-client methods at compile time; specs consume those typed methods through fixtures. Runtime responses are untrusted, so `readJson(response, zodSchema)` validates their actual shape. Generated TypeScript types cannot replace runtime schema parsing because they no longer exist when the test runs.
+- **OpenAPI types:** compile-time payload and client contracts.
+- **Zod + `readJson`:** runtime response shape from the live server.
+
+Eval-only checks:
+
+- **Controlled dataset:** no inline payload/expected literals. This is intentionally strict and may false-positive in a general suite.
+- **Golden parity:** expected statuses and assertion matcher strength. The normal pipeline has no golden answer.
+- **Anti-shortcut:** no disabled tests, inappropriate `test.fail`, or edits to protected inputs/config.
+- **LLM judge (advisory):** expected-result assertion quality. It can false-positive and never decides task pass/fail.
 
 Skills are generic: no Toolshop endpoints inside. Keep them short by **delegating** to the supporting skills (each step names the skill to read) instead of repeating their rules. They must say how to map each finding to an assertion, reuse before creating, where data/POM/fixtures live, and how to verify (`validate:pipeline`, `playwright test`).
 
@@ -337,6 +348,7 @@ Pairs to learn from:
 | `no-manual-sleep` — no fixed waits | `await page.waitForTimeout(2000)` | `await expect(alert).toBeVisible()` |
 | `no-nth-zero`, `no-then-in-async-code`, `no-inline-magic-timeout` — stability | `locator.nth(0)`, `.then(…)`, `{ timeout: 5000 }` | a precise locator, `await`, a named constant |
 | `no-request-context-outside-api-helper` — layering | `request.post(...)` in a spec | `toolshopApi.contact.send(...)` |
+| `spec-imports-fixture-barrel`, `no-raw-playwright-fixture-in-spec` — dependency injection | direct `@data/*` import or `async ({ page })` | import from `@fixtures`; inject `contactPage` / `toolshopApi` |
 | `prefer-test-step` / `no-empty-test-step` — readable reports | a `test()` body with no `test.step` | `await test.step('Verify that …', …)` |
 
 Fix lint errors, never suppress them (`eslint-disable` is itself an error).
@@ -425,28 +437,18 @@ The teaching pattern is:
 
 ### What to check
 
-Use deterministic checks for facts that code can answer exactly. A check is a small pure function over one shared context (`eval/spec-checks.ts`):
+The eval first runs the shared spec checklist from Phase 3. It then adds:
 
-```ts
-export const noDisabledTestsCheck: SpecCheck = ({ specs }) =>
-  gateFromProblems(
-    'no-disabled-tests',
-    [...new Set(specs.flatMap(spec => readDisabledTestMarkers(spec.source)))].map(marker => `${marker} disables a test`),
-  )
-```
+- `no-disabled-tests`: reject `skip`, `fixme`, and `only`;
+- `bug-marking`: require `test.fail` only for cases with an `annotate-gap` finding;
+- `no-hardcoded-test-data`: controlled-dataset check for inline payload/expected literals;
+- `parity:statuses`: require the statuses asserted by the golden;
+- `parity:assertions`: require at least the golden's assertion matcher strength;
+- `protected-files`: reject edits to task inputs, config, tools, and harness;
+- `run:TC-n` (unless `--no-run`): execute each generated case;
+- `judge:TC-n` with `--judge`: advisory expected-result assertion review.
 
-This catches one high-value shortcut: a skipped test cannot fail, so it can fake a successful result. The spec-creation example checks:
-
-- exact manual title and `testCase('TC-n')` annotation, with one test per case;
-- each `test.step` uses an action from that manual case;
-- ESLint, ast-grep, and TypeScript pass;
-- specs import only `@fixtures`, and page objects/API clients are injected through the fixture callback;
-- controlled-dataset check: payloads and expected values come from fixture-exported data, typed API responses, or Zod schemas—not inline literals (intentionally stricter than the normal pipeline);
-- known product bugs use `test.fail` only on the affected case;
-- controlled-golden checks: expected HTTP statuses and assertion matcher strength are not weaker than the reference output;
-- protected inputs/config remain unchanged, and Playwright can optionally run each case.
-
-Generated OpenAPI types provide compile-time request and client contracts. Zod still parses runtime responses; a type alone cannot prove what the live server returned. Golden comparisons avoid helper names and file layout, so a different valid implementation can pass.
+Golden comparisons ignore helper names and file layout, so a different valid implementation can pass.
 
 ### What needs a judge
 

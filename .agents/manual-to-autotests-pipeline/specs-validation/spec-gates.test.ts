@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import { DIRS } from '../../harness-config.ts'
 import { testCaseFileSchema } from '../input-validation/input-schemas.ts'
-import { coverageGate, fixtureBoundaryGate, manualStepNamesGate, stepNamesGate, traceGate } from './spec-gates.ts'
+import { coverageGate, manualStepNamesGate, stepNamesGate, traceGate } from './spec-gates.ts'
 import { levelFromSpecName, readDisabledTestMarkers, readSpecTests } from './spec-source.ts'
 
 const testCases = testCaseFileSchema.parse(JSON.parse(readFileSync(`${DIRS.testCases}/TOOL-1.json`, 'utf8')))
@@ -77,13 +77,6 @@ describe('spec traceability gates', () => {
     assert.equal(manualStepNamesGate(read(source), testCases).status, 'fail')
   })
 
-  it('requires fixture-barrel imports and injected framework fixtures', () => {
-    assert.equal(fixtureBoundaryGate(goodSource, read(goodSource)).status, 'pass')
-    const directImport = goodSource.replace("from '@fixtures'", "from '@data/contact'")
-    assert.equal(fixtureBoundaryGate(directImport, read(directImport)).status, 'fail')
-    const rawPage = goodSource.replace('async ({ contactPage })', 'async ({ page })')
-    assert.equal(fixtureBoundaryGate(rawPage, read(rawPage)).status, 'fail')
-  })
 })
 
 describe('spec coverage gate', () => {
