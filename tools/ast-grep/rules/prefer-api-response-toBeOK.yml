@@ -1,0 +1,15 @@
+id: prefer-api-response-toBeOK
+message: "Asserting `response.ok()` collapses the HTTP result to a boolean. Assert the concrete status with the HttpStatus enum, or use `await expect(response).toBeOK()`."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.ts
+  - src/**/*.ts
+rule:
+  any:
+    - pattern: expect($R.ok()).toBe($B)
+    - pattern: expect($R.ok(), $M).toBe($B)
+    - pattern: expect($R.ok()).toBeTruthy()
+    - pattern: expect($R.ok(), $M).toBeTruthy()
+    - pattern: expect($R.ok()).toBeFalsy()
+    - pattern: expect($R.ok(), $M).toBeFalsy()

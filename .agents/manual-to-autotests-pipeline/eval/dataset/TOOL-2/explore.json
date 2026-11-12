@@ -1,0 +1,264 @@
+{
+  "meta": {
+    "ticket": "TOOL-2",
+    "featureSlug": "contact-limits",
+    "date": "2026-11-11",
+    "baseURL": "https://practicesoftwaretesting.com",
+    "apiURL": "https://api.practicesoftwaretesting.com",
+    "authMode": "anonymous",
+    "authFile": null,
+    "acCovered": [
+      "AC-1",
+      "AC-2",
+      "AC-3"
+    ]
+  },
+  "locators": [],
+  "apiCalls": [
+    {
+      "id": "api.sendNameOverMax",
+      "tcRef": "TC-1",
+      "trigger": "POST /messages with a 121-character name",
+      "method": "POST",
+      "pathPattern": "/messages",
+      "auth": "none",
+      "requestFields": [
+        "name",
+        "email",
+        "subject",
+        "message"
+      ],
+      "responseFields": [
+        "id",
+        "name",
+        "email",
+        "subject",
+        "message",
+        "status",
+        "created_at"
+      ],
+      "observed": [
+        {
+          "case": "name of 121 characters",
+          "status": 422,
+          "body": "{ name: [string] }"
+        }
+      ],
+      "typedClient": "ContactApi.send",
+      "needsClient": false
+    },
+    {
+      "id": "api.sendNameAtMax",
+      "tcRef": "TC-2",
+      "trigger": "POST /messages with a 120-character name",
+      "method": "POST",
+      "pathPattern": "/messages",
+      "auth": "none",
+      "requestFields": [
+        "name",
+        "email",
+        "subject",
+        "message"
+      ],
+      "responseFields": [
+        "id",
+        "name",
+        "email",
+        "subject",
+        "message",
+        "status",
+        "created_at"
+      ],
+      "observed": [
+        {
+          "case": "name of 120 characters",
+          "status": 500,
+          "body": "{ message: 'Something went wrong' } — not a validation error"
+        },
+        {
+          "case": "name of 100 characters",
+          "status": 500,
+          "body": "same server error: the real limit is lower than the declared 120"
+        },
+        {
+          "case": "name of 50 characters",
+          "status": 200,
+          "body": "accepted; echoes the name, status NEW"
+        }
+      ],
+      "typedClient": "ContactApi.send",
+      "needsClient": false
+    },
+    {
+      "id": "api.sendLimits",
+      "tcRef": "TC-3",
+      "trigger": "POST /messages with email / subject at and over their limits",
+      "method": "POST",
+      "pathPattern": "/messages",
+      "auth": "none",
+      "requestFields": [
+        "name",
+        "email",
+        "subject",
+        "message"
+      ],
+      "responseFields": [
+        "id",
+        "name",
+        "email",
+        "subject",
+        "message",
+        "status",
+        "created_at"
+      ],
+      "observed": [
+        {
+          "case": "email of 257 characters",
+          "status": 422,
+          "body": "{ email: [string] }"
+        },
+        {
+          "case": "email of 256 characters",
+          "status": 200,
+          "body": "accepted; echoes the email"
+        },
+        {
+          "case": "subject of 121 characters",
+          "status": 422,
+          "body": "{ subject: [string] }"
+        },
+        {
+          "case": "subject of 120 characters",
+          "status": 200,
+          "body": "accepted; echoes the subject"
+        }
+      ],
+      "typedClient": "ContactApi.send",
+      "needsClient": false
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S1",
+      "tcRef": "TC-1",
+      "level": "api",
+      "description": "Name over the maximum is rejected",
+      "precondition": null,
+      "steps": [
+        {
+          "step": 1,
+          "action": "POST /messages with a 121-character name",
+          "locatorRef": null,
+          "apiCallRef": "api.sendNameOverMax",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 422; body { name: [...] }",
+          "dependsOn": null,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "tcRef": "TC-2",
+      "level": "api",
+      "description": "Name at the maximum is accepted",
+      "precondition": null,
+      "steps": [
+        {
+          "step": 1,
+          "action": "POST /messages with a 120-character name",
+          "locatorRef": null,
+          "apiCallRef": "api.sendNameAtMax",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 500 (bug) instead of acceptance",
+          "dependsOn": null,
+          "notes": "Names of 100 characters already fail; 50 passes"
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "tcRef": "TC-3",
+      "level": "api",
+      "description": "Email and subject limits",
+      "precondition": null,
+      "steps": [
+        {
+          "step": 1,
+          "action": "POST /messages with a 257-character email",
+          "locatorRef": null,
+          "apiCallRef": "api.sendLimits",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 422; body { email: [...] }",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 2,
+          "action": "POST /messages with a 256-character email",
+          "locatorRef": null,
+          "apiCallRef": "api.sendLimits",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 200; echoes the email",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 3,
+          "action": "POST /messages with a 121-character subject",
+          "locatorRef": null,
+          "apiCallRef": "api.sendLimits",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 422; body { subject: [...] }",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 4,
+          "action": "POST /messages with a 120-character subject",
+          "locatorRef": null,
+          "apiCallRef": "api.sendLimits",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 200; echoes the subject",
+          "dependsOn": null,
+          "notes": null
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "tcRef": "TC-2",
+      "step": 1,
+      "expected": "A 120-character name is accepted and echoed",
+      "observed": "HTTP 500 'Something went wrong' for names of 100 characters and above; 50 characters is accepted",
+      "resolution": "annotate-gap"
+    }
+  ],
+  "pomPlan": {
+    "pages": [],
+    "apiClients": [
+      {
+        "className": "ContactApi",
+        "file": "src/helpers/api/ContactApi.ts",
+        "newMethods": [],
+        "reusedFrom": [
+          "ContactApi.send"
+        ]
+      }
+    ]
+  }
+}

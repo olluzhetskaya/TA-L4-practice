@@ -1,0 +1,250 @@
+{
+  "meta": {
+    "ticket": "TOOL-3",
+    "featureSlug": "product-search",
+    "date": "2026-11-11",
+    "baseURL": "https://practicesoftwaretesting.com",
+    "apiURL": "https://api.practicesoftwaretesting.com",
+    "authMode": "anonymous",
+    "authFile": null,
+    "acCovered": [
+      "AC-1",
+      "AC-2"
+    ]
+  },
+  "locators": [
+    {
+      "id": "products.searchBox",
+      "tcRef": "TC-1",
+      "tcAction": "Search for the keyword",
+      "uiLabel": "Search",
+      "locator": "getByRole('textbox', { name: 'Search' })",
+      "page": "products",
+      "verifiedBy": "fill",
+      "notes": "Sidebar filter; a heading with the same text exists, the role disambiguates"
+    },
+    {
+      "id": "products.searchButton",
+      "tcRef": "TC-1",
+      "tcAction": "Submit the search",
+      "uiLabel": "Search",
+      "locator": "getByRole('button', { name: 'Search' })",
+      "page": "products",
+      "verifiedBy": "click",
+      "notes": null
+    },
+    {
+      "id": "products.searchHeading",
+      "tcRef": "TC-1",
+      "tcAction": "The keyword heading is displayed",
+      "uiLabel": "Searched for: pliers",
+      "locator": "getByRole('heading', { name: 'Searched for: pliers' })",
+      "page": "products",
+      "verifiedBy": "assert",
+      "notes": "Heading level 3; text is 'Searched for: ' + the keyword"
+    },
+    {
+      "id": "products.names",
+      "tcRef": "TC-1",
+      "tcAction": "Compare the listed products",
+      "uiLabel": "Combination Pliers, Pliers, Long Nose Pliers, Slip Joint Pliers",
+      "locator": "getByRole('heading', { level: 5 })",
+      "page": "products",
+      "verifiedBy": "assert",
+      "notes": "One level-5 heading per product card; order matches the API response"
+    },
+    {
+      "id": "products.emptyHeading",
+      "tcRef": "TC-2",
+      "tcAction": "The keyword heading is displayed",
+      "uiLabel": "Searched for: zzzzzz",
+      "locator": "getByRole('heading', { name: 'Searched for: zzzzzz' })",
+      "page": "products",
+      "verifiedBy": "assert",
+      "notes": null
+    },
+    {
+      "id": "products.emptyMessage",
+      "tcRef": "TC-2",
+      "tcAction": "The no-results message is displayed",
+      "uiLabel": "There are no products found.",
+      "locator": "getByText('There are no products found.')",
+      "page": "products",
+      "verifiedBy": "assert",
+      "notes": "Plain text node; no product cards render"
+    }
+  ],
+  "apiCalls": [
+    {
+      "id": "api.searchProducts",
+      "tcRef": "TC-1",
+      "trigger": "Search for a keyword in the storefront",
+      "method": "GET",
+      "pathPattern": "/products/search",
+      "auth": "none",
+      "requestFields": [
+        "q"
+      ],
+      "responseFields": [
+        "current_page",
+        "data",
+        "from",
+        "last_page",
+        "per_page",
+        "to",
+        "total"
+      ],
+      "observed": [
+        {
+          "case": "q=pliers",
+          "status": 200,
+          "body": "data[].name = Combination Pliers, Pliers, Long Nose Pliers, Slip Joint Pliers; total 4"
+        },
+        {
+          "case": "q=zzzzzz",
+          "status": 200,
+          "body": "data is an empty array; total 0"
+        }
+      ],
+      "typedClient": null,
+      "needsClient": true
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S1",
+      "tcRef": "TC-1",
+      "level": "ui",
+      "description": "Keyword search lists the catalogue's matches",
+      "precondition": "Visitor on the storefront home page",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Type 'pliers' into the search box",
+          "locatorRef": "products.searchBox",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Search box holds 'pliers'",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 2,
+          "action": "Click Search",
+          "locatorRef": "products.searchButton",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Heading 'Searched for: pliers' appears and the results re-render",
+          "dependsOn": 1,
+          "notes": null
+        },
+        {
+          "step": 3,
+          "action": "Read the heading",
+          "locatorRef": "products.searchHeading",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Heading is visible",
+          "dependsOn": 2,
+          "notes": null
+        },
+        {
+          "step": 4,
+          "action": "Read the product names and compare with GET /products/search?q=pliers",
+          "locatorRef": "products.names",
+          "apiCallRef": "api.searchProducts",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Four names, same order as the API response",
+          "dependsOn": 2,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "tcRef": "TC-2",
+      "level": "ui",
+      "description": "No matches shows the empty state",
+      "precondition": "Visitor on the storefront home page",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Search for 'zzzzzz'",
+          "locatorRef": "products.searchBox",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Search submitted",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 2,
+          "action": "Read the heading and the message",
+          "locatorRef": "products.emptyMessage",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "'Searched for: zzzzzz' and 'There are no products found.' are visible; no product cards",
+          "dependsOn": 1,
+          "notes": null
+        },
+        {
+          "step": 3,
+          "action": "Read the keyword heading",
+          "locatorRef": "products.emptyHeading",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Heading is visible",
+          "dependsOn": 1,
+          "notes": null
+        }
+      ]
+    }
+  ],
+  "findings": [],
+  "pomPlan": {
+    "pages": [
+      {
+        "className": "ProductsPage",
+        "file": "src/pages/ProductsPage.ts",
+        "newMethods": [
+          "open",
+          "search",
+          "getSearchBox",
+          "getSearchButton",
+          "getSearchHeading",
+          "getProductNames",
+          "getNoResultsMessage"
+        ],
+        "reusedFrom": [
+          "BasePage"
+        ]
+      }
+    ],
+    "apiClients": [
+      {
+        "className": "ProductsApi",
+        "file": "src/helpers/api/ProductsApi.ts",
+        "newMethods": [
+          "search"
+        ],
+        "reusedFrom": [
+          "BaseApi"
+        ]
+      }
+    ]
+  }
+}

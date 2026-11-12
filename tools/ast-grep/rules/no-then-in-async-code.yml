@@ -1,0 +1,14 @@
+id: no-then-in-async-code
+message: "`.then(...)` in async code — use `await` to keep the stack trace intact."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.ts
+  - src/**/*.ts
+rule:
+  pattern: $P.then($CB)
+constraints:
+  CB:
+    any:
+      - kind: arrow_function
+      - kind: function_expression

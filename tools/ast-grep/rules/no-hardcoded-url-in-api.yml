@@ -1,0 +1,10 @@
+id: no-hardcoded-url-in-api
+message: "Hard-coded absolute URL in a helper. Read it from config (src/config)."
+severity: error
+language: TypeScript
+files:
+  - src/helpers/**/*.ts
+  - src/pages/**/*.ts
+rule:
+  kind: string_fragment
+  regex: '^https?://'

@@ -1,0 +1,11 @@
+id: no-fixture-in-page-object
+message: "Page objects stay framework-agnostic: no test.info() / test.step() inside src/pages. Wrap in the spec instead."
+severity: error
+language: TypeScript
+files:
+  - src/pages/**/*.ts
+rule:
+  any:
+    - pattern: test.info()
+    - pattern: test.info($$$)
+    - pattern: test.step($$$)

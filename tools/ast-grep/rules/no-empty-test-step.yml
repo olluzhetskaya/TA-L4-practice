@@ -1,0 +1,10 @@
+id: no-empty-test-step
+message: "test.step(...) with an empty body — dead scaffolding from a partial write."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.ts
+rule:
+  any:
+    - pattern: test.step($NAME, async () => {})
+    - pattern: test.step($NAME, async ($$$) => {})

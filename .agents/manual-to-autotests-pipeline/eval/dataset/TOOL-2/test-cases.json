@@ -1,0 +1,68 @@
+{
+  "ticket": "TOOL-2",
+  "testCases": [
+    {
+      "id": "TC-1",
+      "title": "Verify that the contact API rejects a sender name over the maximum length",
+      "level": "api",
+      "priority": "High",
+      "acRefs": ["AC-1"],
+      "preconditions": ["The contact endpoint POST /messages is reachable without authentication"],
+      "steps": [
+        {
+          "action": "Send a contact message whose name is 121 characters long",
+          "data": "name: 121 x 'x'; other fields valid",
+          "expected": "HTTP 422; the validation error names the name field"
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "TC-2",
+      "title": "Verify that the contact API accepts a sender name of exactly the maximum length",
+      "level": "api",
+      "priority": "High",
+      "acRefs": ["AC-1"],
+      "preconditions": ["The contact endpoint POST /messages is reachable without authentication"],
+      "steps": [
+        {
+          "action": "Send a contact message whose name is exactly 120 characters long",
+          "data": "name: 120 x 'x'; other fields valid",
+          "expected": "The message is accepted and the response echoes the name with status NEW"
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "TC-3",
+      "title": "Verify that the contact API enforces the email and subject length limits",
+      "level": "api",
+      "priority": "Medium",
+      "acRefs": ["AC-2", "AC-3"],
+      "preconditions": ["The contact endpoint POST /messages is reachable without authentication"],
+      "steps": [
+        {
+          "action": "Send a contact message with an email address of 257 characters",
+          "data": "email: 257 characters, ending in @example.com",
+          "expected": "HTTP 422; the validation error names the email field"
+        },
+        {
+          "action": "Send a contact message with an email address of exactly 256 characters",
+          "data": "email: 256 characters, ending in @example.com",
+          "expected": "The message is accepted and the response echoes the email"
+        },
+        {
+          "action": "Send a contact message with a subject of 121 characters",
+          "data": "subject: 121 x 's'",
+          "expected": "HTTP 422; the validation error names the subject field"
+        },
+        {
+          "action": "Send a contact message with a subject of exactly 120 characters",
+          "data": "subject: 120 x 's'",
+          "expected": "The message is accepted and the response echoes the subject"
+        }
+      ],
+      "notes": null
+    }
+  ]
+}

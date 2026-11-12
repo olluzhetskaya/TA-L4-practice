@@ -1,0 +1,42 @@
+{
+  "ticket": "TOOL-3",
+  "testCases": [
+    {
+      "id": "TC-1",
+      "title": "Verify that searching by keyword lists the matching products",
+      "level": "ui",
+      "priority": "High",
+      "acRefs": ["AC-1"],
+      "preconditions": ["The visitor is on the storefront home page"],
+      "steps": [
+        {
+          "action": "Search for the keyword \"pliers\"",
+          "data": "pliers",
+          "expected": "The heading \"Searched for: pliers\" is displayed"
+        },
+        {
+          "action": "Compare the listed products with the catalogue search for the same keyword",
+          "data": "-",
+          "expected": "The page lists exactly the product names the catalogue search returns for \"pliers\", in the same order"
+        }
+      ],
+      "notes": "The expected product list comes from the catalogue search API, not from a hard-coded list."
+    },
+    {
+      "id": "TC-2",
+      "title": "Verify that a search without matches shows the empty state",
+      "level": "ui",
+      "priority": "Medium",
+      "acRefs": ["AC-2"],
+      "preconditions": ["The visitor is on the storefront home page"],
+      "steps": [
+        {
+          "action": "Search for a keyword that matches nothing",
+          "data": "zzzzzz",
+          "expected": "The heading \"Searched for: zzzzzz\" and the message \"There are no products found.\" are displayed"
+        }
+      ],
+      "notes": null
+    }
+  ]
+}

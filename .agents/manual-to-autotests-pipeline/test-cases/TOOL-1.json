@@ -1,0 +1,104 @@
+{
+  "ticket": "TOOL-1",
+  "testCases": [
+    {
+      "id": "TC-1",
+      "title": "Verify that the contact API rejects invalid messages and accepts a boundary-length message",
+      "level": "api",
+      "priority": "High",
+      "acRefs": ["AC-4", "AC-5", "AC-6", "AC-2"],
+      "preconditions": ["The contact endpoint POST /messages is reachable without authentication"],
+      "steps": [
+        {
+          "action": "Send a contact message with a malformed email address",
+          "data": "{ \"name\": \"Jane Doe\", \"email\": \"not-an-email\", \"subject\": \"customer-service\", \"message\": \"<valid 60 character message>\" }",
+          "expected": "HTTP 422; the validation error names the email field"
+        },
+        {
+          "action": "Send a contact message without a subject",
+          "data": "{ \"name\": \"Jane Doe\", \"email\": \"jane@example.com\", \"message\": \"<valid 60 character message>\" }",
+          "expected": "HTTP 422; the validation error names the subject field"
+        },
+        {
+          "action": "Send a contact message of 251 characters",
+          "data": "message: 251 x 'x'",
+          "expected": "HTTP 422; the validation error names the message field"
+        },
+        {
+          "action": "Send a contact message of exactly 250 characters",
+          "data": "message: 250 x 'x'",
+          "expected": "HTTP 201; the response echoes the submitted message and has status NEW"
+        },
+        {
+          "action": "Send a contact message of 49 characters",
+          "data": "message: 49 x 'x'",
+          "expected": "HTTP 422; the validation error names the message field"
+        }
+      ],
+      "notes": "Step 5 follows AC-2. Whether the 50-character minimum is enforced by the service or only by the form is not stated in the story."
+    },
+    {
+      "id": "TC-2",
+      "title": "Verify that an authenticated customer's contact message is stored exactly as submitted",
+      "level": "api",
+      "priority": "High",
+      "acRefs": ["AC-7"],
+      "preconditions": ["A customer account exists and a bearer token for it is available"],
+      "steps": [
+        {
+          "action": "Send a contact message as the signed-in customer",
+          "data": "{ \"subject\": \"customer-service\", \"message\": \"<valid 60 character message>\" }",
+          "expected": "HTTP 201; the response contains an id and status NEW"
+        },
+        {
+          "action": "Read the stored message back by id as the same customer",
+          "data": "GET /messages/{id}",
+          "expected": "HTTP 200; subject and message are identical to what was sent; status is NEW"
+        }
+      ],
+      "notes": "Read-back is only possible for the authenticated sender; anonymous callers cannot read messages."
+    },
+    {
+      "id": "TC-3",
+      "title": "Verify that a visitor can send a message through the contact form",
+      "level": "ui",
+      "priority": "Critical",
+      "acRefs": ["AC-1"],
+      "preconditions": ["The visitor is not signed in", "The contact page is open"],
+      "steps": [
+        {
+          "action": "Fill in first name, last name, email address, choose a subject, and enter a message of at least 50 characters",
+          "data": "Jane / Doe / jane@example.com / Customer service / <valid 60 character message>",
+          "expected": "All fields show the entered values; no validation error is displayed"
+        },
+        {
+          "action": "Send the form",
+          "data": "-",
+          "expected": "The form is replaced by the confirmation \"Thanks for your message! We will contact you shortly.\""
+        }
+      ],
+      "notes": null
+    },
+    {
+      "id": "TC-4",
+      "title": "Verify that the contact form blocks invalid input before sending",
+      "level": "ui",
+      "priority": "High",
+      "acRefs": ["AC-2", "AC-3"],
+      "preconditions": ["The visitor is not signed in", "The contact page is open"],
+      "steps": [
+        {
+          "action": "Send the empty form",
+          "data": "-",
+          "expected": "A \"<Field> is required\" error appears next to first name, last name, email address, subject, and message; no request is sent to the server"
+        },
+        {
+          "action": "Fill every field but enter a message of 49 characters, then send the form",
+          "data": "message: 49 x 'x'",
+          "expected": "The error \"Message must be minimal 50 characters\" is shown next to the message field; no request is sent to the server"
+        }
+      ],
+      "notes": "\"No request is sent\" must be observed on the network, not inferred from the absence of the confirmation."
+    }
+  ]
+}

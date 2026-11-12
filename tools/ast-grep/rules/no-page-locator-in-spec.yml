@@ -1,0 +1,16 @@
+id: no-page-locator-in-spec
+message: "Locators belong in page objects, not in spec files. Expose a getter on the page object."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.spec.ts
+rule:
+  any:
+    - pattern: page.locator($$$)
+    - pattern: page.getByRole($$$)
+    - pattern: page.getByText($$$)
+    - pattern: page.getByTestId($$$)
+    - pattern: page.getByLabel($$$)
+    - pattern: page.getByPlaceholder($$$)
+    - pattern: page.getByTitle($$$)
+    - pattern: page.getByAltText($$$)

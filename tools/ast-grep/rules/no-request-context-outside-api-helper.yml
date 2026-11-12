@@ -1,0 +1,15 @@
+id: no-request-context-outside-api-helper
+message: "Direct `request.*` HTTP call — route it through an API client class under src/helpers/api/."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.spec.ts
+  - src/pages/**/*.ts
+rule:
+  any:
+    - pattern: $CTX.request.get($$$)
+    - pattern: $CTX.request.post($$$)
+    - pattern: $CTX.request.put($$$)
+    - pattern: $CTX.request.patch($$$)
+    - pattern: $CTX.request.delete($$$)
+    - pattern: $CTX.request.fetch($$$)

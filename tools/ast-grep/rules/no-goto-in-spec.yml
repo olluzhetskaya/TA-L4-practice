@@ -1,0 +1,10 @@
+id: no-goto-in-spec
+message: "`page.goto` in a spec bypasses page-object navigation. Call the page object's `open()` instead."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.spec.ts
+rule:
+  any:
+    - pattern: page.goto($URL)
+    - pattern: page.goto($URL, $$$)

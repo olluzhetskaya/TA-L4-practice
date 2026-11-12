@@ -1,0 +1,16 @@
+id: no-inline-magic-timeout
+message: "Numeric `timeout:` literal — name it in src/config/timeouts.ts."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.ts
+  - src/**/*.ts
+rule:
+  all:
+    - kind: pair
+    - has:
+        field: key
+        regex: '^timeout$'
+    - has:
+        field: value
+        kind: number

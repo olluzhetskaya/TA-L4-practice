@@ -1,0 +1,507 @@
+{
+  "title": "SUT exploration artifact (analyse-sut output)",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "meta": {
+      "type": "object",
+      "properties": {
+        "ticket": {
+          "type": "string",
+          "pattern": "^[A-Z][A-Z0-9]+-\\d+$"
+        },
+        "featureSlug": {
+          "type": "string",
+          "minLength": 1
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "baseURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "apiURL": {
+          "type": "string",
+          "format": "uri"
+        },
+        "authMode": {
+          "type": "string",
+          "enum": [
+            "anonymous",
+            "customer"
+          ]
+        },
+        "authFile": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "acCovered": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^AC-\\d+$"
+          }
+        }
+      },
+      "required": [
+        "ticket",
+        "featureSlug",
+        "date",
+        "baseURL",
+        "apiURL",
+        "authMode",
+        "authFile",
+        "acCovered"
+      ],
+      "additionalProperties": false
+    },
+    "locators": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Stable key referenced by scenario steps, e.g. \"contact.sendButton\""
+          },
+          "tcRef": {
+            "type": "string",
+            "pattern": "^TC-\\d+$"
+          },
+          "tcAction": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Business wording from the test case step"
+          },
+          "uiLabel": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Text actually rendered in the UI"
+          },
+          "locator": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Playwright expression, e.g. getByRole('button', { name: 'Send' })"
+          },
+          "page": {
+            "type": "string",
+            "minLength": 1
+          },
+          "verifiedBy": {
+            "type": "string",
+            "enum": [
+              "snapshot",
+              "click",
+              "fill",
+              "select",
+              "assert"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "tcRef",
+          "tcAction",
+          "uiLabel",
+          "locator",
+          "page",
+          "verifiedBy",
+          "notes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "apiCalls": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tcRef": {
+            "type": "string",
+            "pattern": "^TC-\\d+$"
+          },
+          "trigger": {
+            "type": "string",
+            "minLength": 1
+          },
+          "method": {
+            "type": "string",
+            "enum": [
+              "GET",
+              "POST",
+              "PUT",
+              "PATCH",
+              "DELETE"
+            ]
+          },
+          "pathPattern": {
+            "type": "string",
+            "minLength": 1,
+            "description": "Path only, no host — e.g. /messages/{id}"
+          },
+          "auth": {
+            "type": "string",
+            "enum": [
+              "none",
+              "bearer"
+            ]
+          },
+          "requestFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "responseFields": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "observed": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "case": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "What was sent, in words"
+                },
+                "status": {
+                  "type": "integer",
+                  "minimum": 100,
+                  "maximum": 599
+                },
+                "body": {
+                  "description": "Short note on the response body shape — not a full dump",
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "case",
+                "status",
+                "body"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Live pre-flight results — the contract source of truth"
+          },
+          "typedClient": {
+            "description": "Existing client method, or null",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "needsClient": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "tcRef",
+          "trigger",
+          "method",
+          "pathPattern",
+          "auth",
+          "requestFields",
+          "responseFields",
+          "observed",
+          "typedClient",
+          "needsClient"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "scenarios": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tcRef": {
+            "type": "string",
+            "pattern": "^TC-\\d+$"
+          },
+          "level": {
+            "type": "string",
+            "enum": [
+              "api",
+              "ui"
+            ]
+          },
+          "description": {
+            "type": "string",
+            "minLength": 1
+          },
+          "precondition": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "steps": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "step": {
+                  "type": "integer",
+                  "exclusiveMinimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "action": {
+                  "type": "string",
+                  "minLength": 1
+                },
+                "locatorRef": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "apiCallRef": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "opensModal": {
+                  "type": "boolean"
+                },
+                "modalDismiss": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "buttonState": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "disabled-on-open",
+                        "disabled-until-loaded"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "outcome": {
+                  "type": "string",
+                  "minLength": 1,
+                  "description": "Observable result — specific, never \"it works\""
+                },
+                "dependsOn": {
+                  "anyOf": [
+                    {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "notes": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "step",
+                "action",
+                "locatorRef",
+                "apiCallRef",
+                "opensModal",
+                "modalDismiss",
+                "buttonState",
+                "outcome",
+                "dependsOn",
+                "notes"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "tcRef",
+          "level",
+          "description",
+          "precondition",
+          "steps"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "findings": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "tcRef": {
+            "type": "string",
+            "pattern": "^TC-\\d+$"
+          },
+          "step": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+          },
+          "expected": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the test case says"
+          },
+          "observed": {
+            "type": "string",
+            "minLength": 1,
+            "description": "What the live SUT did"
+          },
+          "resolution": {
+            "type": "string",
+            "enum": [
+              "assert-observed",
+              "move-to-ui",
+              "move-to-api",
+              "annotate-gap"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "tcRef",
+          "step",
+          "expected",
+          "observed",
+          "resolution"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "pomPlan": {
+      "type": "object",
+      "properties": {
+        "pages": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "className": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "newMethods": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reusedFrom": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "className",
+              "file",
+              "newMethods",
+              "reusedFrom"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "apiClients": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "className": {
+                "type": "string",
+                "minLength": 1
+              },
+              "file": {
+                "type": "string",
+                "minLength": 1
+              },
+              "newMethods": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reusedFrom": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "className",
+              "file",
+              "newMethods",
+              "reusedFrom"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "pages",
+        "apiClients"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "meta",
+    "locators",
+    "apiCalls",
+    "scenarios",
+    "findings",
+    "pomPlan"
+  ],
+  "additionalProperties": false
+}

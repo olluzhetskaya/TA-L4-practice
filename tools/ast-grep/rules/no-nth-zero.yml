@@ -1,0 +1,9 @@
+id: no-nth-zero
+message: "Use `.first()` instead of `.nth(0)`."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.ts
+  - src/**/*.ts
+rule:
+  pattern: $LOC.nth(0)

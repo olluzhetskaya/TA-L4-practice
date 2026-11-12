@@ -1,0 +1,557 @@
+{
+  "meta": {
+    "ticket": "TOOL-1",
+    "featureSlug": "contact-form",
+    "date": "2026-11-11",
+    "baseURL": "https://practicesoftwaretesting.com",
+    "apiURL": "https://api.practicesoftwaretesting.com",
+    "authMode": "customer",
+    "authFile": ".auth/customer.json",
+    "acCovered": [
+      "AC-1",
+      "AC-2",
+      "AC-3",
+      "AC-4",
+      "AC-5",
+      "AC-6",
+      "AC-7"
+    ]
+  },
+  "locators": [
+    {
+      "id": "contact.firstName",
+      "tcRef": "TC-3",
+      "tcAction": "Fill in first name",
+      "uiLabel": "First name",
+      "locator": "getByLabel('First name')",
+      "page": "contact",
+      "verifiedBy": "fill",
+      "notes": null
+    },
+    {
+      "id": "contact.lastName",
+      "tcRef": "TC-3",
+      "tcAction": "Fill in last name",
+      "uiLabel": "Last name",
+      "locator": "getByLabel('Last name')",
+      "page": "contact",
+      "verifiedBy": "fill",
+      "notes": null
+    },
+    {
+      "id": "contact.email",
+      "tcRef": "TC-3",
+      "tcAction": "Fill in email address",
+      "uiLabel": "Email address",
+      "locator": "getByLabel('Email address')",
+      "page": "contact",
+      "verifiedBy": "fill",
+      "notes": "Placeholder is 'Your email *'; the label is 'Email address'"
+    },
+    {
+      "id": "contact.subject",
+      "tcRef": "TC-3",
+      "tcAction": "Choose a subject",
+      "uiLabel": "Subject",
+      "locator": "getByRole('combobox', { name: 'Subject' })",
+      "page": "contact",
+      "verifiedBy": "select",
+      "notes": "Native select with no preselected option; options show labels (e.g. 'Customer service'), values are slugs (customer-service)"
+    },
+    {
+      "id": "contact.message",
+      "tcRef": "TC-3",
+      "tcAction": "Enter a message",
+      "uiLabel": "Message *",
+      "locator": "getByRole('textbox', { name: 'Message' })",
+      "page": "contact",
+      "verifiedBy": "fill",
+      "notes": "Accessible name includes the asterisk; substring match is enough"
+    },
+    {
+      "id": "contact.send",
+      "tcRef": "TC-3",
+      "tcAction": "Send the form",
+      "uiLabel": "Send",
+      "locator": "getByRole('button', { name: 'Send' })",
+      "page": "contact",
+      "verifiedBy": "click",
+      "notes": "First click after errors clear can miss because the error alerts collapse and shift the button; Playwright's actionability retry handles it"
+    },
+    {
+      "id": "contact.confirmation",
+      "tcRef": "TC-3",
+      "tcAction": "The form is replaced by the confirmation",
+      "uiLabel": "Thanks for your message! We will contact you shortly.",
+      "locator": "getByRole('alert').filter({ hasText: 'Thanks for your message! We will contact you shortly.' })",
+      "page": "contact",
+      "verifiedBy": "assert",
+      "notes": "Rendered in an element with role=alert; the form disappears"
+    },
+    {
+      "id": "contact.requiredErrors",
+      "tcRef": "TC-4",
+      "tcAction": "A required error appears next to every field",
+      "uiLabel": "First name is required",
+      "locator": "getByRole('alert').filter({ hasText: 'First name is required' })",
+      "page": "contact",
+      "verifiedBy": "assert",
+      "notes": "One role=alert per field; texts: First name / Last name / Email / Subject / Message + ' is required'. Email's error says 'Email', not 'Email address'"
+    },
+    {
+      "id": "contact.messageTooShort",
+      "tcRef": "TC-4",
+      "tcAction": "The minimum-length error is shown",
+      "uiLabel": "Message must be minimal 50 characters",
+      "locator": "getByRole('alert').filter({ hasText: 'Message must be minimal 50 characters' })",
+      "page": "contact",
+      "verifiedBy": "assert",
+      "notes": "Client-side rule; no request leaves the browser"
+    }
+  ],
+  "apiCalls": [
+    {
+      "id": "api.sendMessage",
+      "tcRef": "TC-1",
+      "trigger": "Submit the contact form (anonymous)",
+      "method": "POST",
+      "pathPattern": "/messages",
+      "auth": "none",
+      "requestFields": [
+        "name",
+        "email",
+        "subject",
+        "message"
+      ],
+      "responseFields": [
+        "id",
+        "name",
+        "email",
+        "subject",
+        "message",
+        "status",
+        "created_at"
+      ],
+      "observed": [
+        {
+          "case": "valid payload, 58-character message",
+          "status": 200,
+          "body": "echoes the payload + id, status NEW, created_at"
+        },
+        {
+          "case": "email 'not-an-email'",
+          "status": 422,
+          "body": "{ email: [string] }"
+        },
+        {
+          "case": "subject omitted",
+          "status": 422,
+          "body": "{ subject: [string] }"
+        },
+        {
+          "case": "message of 251 characters",
+          "status": 422,
+          "body": "{ message: [string] }"
+        },
+        {
+          "case": "message of 250 characters",
+          "status": 200,
+          "body": "echoes message, status NEW"
+        },
+        {
+          "case": "message of 49 characters",
+          "status": 200,
+          "body": "accepted — the 50-character minimum is not enforced by the service"
+        },
+        {
+          "case": "email omitted",
+          "status": 200,
+          "body": "accepted — email is not required by the service"
+        },
+        {
+          "case": "subject 'bogus' (not in the form's list)",
+          "status": 200,
+          "body": "accepted — subject values are not validated"
+        }
+      ],
+      "typedClient": "ContactApi.send",
+      "needsClient": false
+    },
+    {
+      "id": "api.sendMessageAuthenticated",
+      "tcRef": "TC-2",
+      "trigger": "Submit a message as the signed-in customer",
+      "method": "POST",
+      "pathPattern": "/messages",
+      "auth": "bearer",
+      "requestFields": [
+        "subject",
+        "message"
+      ],
+      "responseFields": [
+        "id",
+        "user_id",
+        "subject",
+        "message",
+        "status",
+        "created_at"
+      ],
+      "observed": [
+        {
+          "case": "subject + message with a customer bearer token",
+          "status": 200,
+          "body": "echoes subject/message, adds user_id, status NEW"
+        }
+      ],
+      "typedClient": "ContactApi.send",
+      "needsClient": false
+    },
+    {
+      "id": "api.getMessage",
+      "tcRef": "TC-2",
+      "trigger": "Read the stored message back by id",
+      "method": "GET",
+      "pathPattern": "/messages/{id}",
+      "auth": "bearer",
+      "requestFields": [],
+      "responseFields": [
+        "id",
+        "user_id",
+        "name",
+        "email",
+        "subject",
+        "message",
+        "status",
+        "created_at",
+        "user",
+        "replies"
+      ],
+      "observed": [
+        {
+          "case": "GET by id as the sender",
+          "status": 200,
+          "body": "subject/message/status identical to what was sent; name and email are null for an authenticated sender"
+        },
+        {
+          "case": "GET by id without a token",
+          "status": 401,
+          "body": "{ message: 'Unauthorized' }"
+        }
+      ],
+      "typedClient": "ContactApi.getById",
+      "needsClient": false
+    }
+  ],
+  "scenarios": [
+    {
+      "id": "S1",
+      "tcRef": "TC-1",
+      "level": "api",
+      "description": "Contact service validation and boundary values",
+      "precondition": "Endpoint reachable without authentication",
+      "steps": [
+        {
+          "step": 1,
+          "action": "POST /messages with email 'not-an-email'",
+          "locatorRef": null,
+          "apiCallRef": "api.sendMessage",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 422; body { email: [...] }",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 2,
+          "action": "POST /messages without subject",
+          "locatorRef": null,
+          "apiCallRef": "api.sendMessage",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 422; body { subject: [...] }",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 3,
+          "action": "POST /messages with a 251-character message",
+          "locatorRef": null,
+          "apiCallRef": "api.sendMessage",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 422; body { message: [...] }",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 4,
+          "action": "POST /messages with a 250-character message",
+          "locatorRef": null,
+          "apiCallRef": "api.sendMessage",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 200 (not 201); echoes the message, status NEW",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 5,
+          "action": "POST /messages with a 49-character message",
+          "locatorRef": null,
+          "apiCallRef": "api.sendMessage",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 200 — accepted; the minimum is a form rule only",
+          "dependsOn": null,
+          "notes": "Not asserted at API level; covered by TC-4"
+        }
+      ]
+    },
+    {
+      "id": "S2",
+      "tcRef": "TC-2",
+      "level": "api",
+      "description": "Authenticated message round-trip",
+      "precondition": "Customer bearer token (global setup writes .auth/customer.json)",
+      "steps": [
+        {
+          "step": 1,
+          "action": "POST /messages as the signed-in customer",
+          "locatorRef": null,
+          "apiCallRef": "api.sendMessageAuthenticated",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 200; id, user_id, status NEW",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 2,
+          "action": "GET /messages/{id} as the same customer",
+          "locatorRef": null,
+          "apiCallRef": "api.getMessage",
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "HTTP 200; subject, message, status match the submission",
+          "dependsOn": 1,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "id": "S3",
+      "tcRef": "TC-3",
+      "level": "ui",
+      "description": "Visitor sends a message",
+      "precondition": "Anonymous visitor on /contact",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Fill first name, last name, email",
+          "locatorRef": "contact.firstName",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Fields hold the entered values; no error alert",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 2,
+          "action": "Choose subject 'Customer service'",
+          "locatorRef": "contact.subject",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Select shows 'Customer service'",
+          "dependsOn": 1,
+          "notes": null
+        },
+        {
+          "step": 3,
+          "action": "Enter a message of at least 50 characters",
+          "locatorRef": "contact.message",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Message holds the text; no error alert",
+          "dependsOn": 2,
+          "notes": null
+        },
+        {
+          "step": 4,
+          "action": "Click Send",
+          "locatorRef": "contact.send",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Form is replaced by the alert 'Thanks for your message! We will contact you shortly.' after one POST /messages (200)",
+          "dependsOn": 3,
+          "notes": null
+        },
+        {
+          "step": 5,
+          "action": "Read the confirmation",
+          "locatorRef": "contact.confirmation",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Confirmation alert is visible",
+          "dependsOn": 4,
+          "notes": null
+        }
+      ]
+    },
+    {
+      "id": "S4",
+      "tcRef": "TC-4",
+      "level": "ui",
+      "description": "Client-side validation blocks submission",
+      "precondition": "Anonymous visitor on /contact, form untouched",
+      "steps": [
+        {
+          "step": 1,
+          "action": "Click Send on the empty form",
+          "locatorRef": "contact.send",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Five role=alert errors appear; no POST /messages in the network log",
+          "dependsOn": null,
+          "notes": null
+        },
+        {
+          "step": 2,
+          "action": "Read the required errors",
+          "locatorRef": "contact.requiredErrors",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "'First name is required', 'Last name is required', 'Email is required', 'Subject is required', 'Message is required'",
+          "dependsOn": 1,
+          "notes": null
+        },
+        {
+          "step": 3,
+          "action": "Fill every field with a 49-character message and click Send",
+          "locatorRef": "contact.message",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "The message error changes to 'Message must be minimal 50 characters'",
+          "dependsOn": 2,
+          "notes": null
+        },
+        {
+          "step": 4,
+          "action": "Read the minimum-length error",
+          "locatorRef": "contact.messageTooShort",
+          "apiCallRef": null,
+          "opensModal": false,
+          "modalDismiss": null,
+          "buttonState": null,
+          "outcome": "Alert is visible; still no POST /messages",
+          "dependsOn": 3,
+          "notes": null
+        }
+      ]
+    }
+  ],
+  "findings": [
+    {
+      "id": "F1",
+      "tcRef": "TC-1",
+      "step": 4,
+      "expected": "HTTP 201 for an accepted message",
+      "observed": "HTTP 200 with the created record",
+      "resolution": "assert-observed"
+    },
+    {
+      "id": "F2",
+      "tcRef": "TC-1",
+      "step": 5,
+      "expected": "HTTP 422 naming the message field for a 49-character message",
+      "observed": "HTTP 200 — the service accepts it; only the form enforces the 50-character minimum",
+      "resolution": "move-to-ui"
+    },
+    {
+      "id": "F3",
+      "tcRef": "TC-2",
+      "step": 1,
+      "expected": "HTTP 201 with an id and status NEW",
+      "observed": "HTTP 200 with id, user_id and status NEW",
+      "resolution": "assert-observed"
+    },
+    {
+      "id": "F4",
+      "tcRef": "TC-4",
+      "step": 1,
+      "expected": "'<Field> is required' for email address",
+      "observed": "The email error reads 'Email is required' while the label reads 'Email address'",
+      "resolution": "assert-observed"
+    }
+  ],
+  "pomPlan": {
+    "pages": [
+      {
+        "className": "ContactPage",
+        "file": "src/pages/ContactPage.ts",
+        "newMethods": [
+          "open",
+          "fillForm",
+          "submit",
+          "trackSubmissions",
+          "getAlert",
+          "getFirstNameInput",
+          "getLastNameInput",
+          "getEmailInput",
+          "getSubjectSelect",
+          "getMessageInput",
+          "getSendButton"
+        ],
+        "reusedFrom": [
+          "BasePage"
+        ]
+      }
+    ],
+    "apiClients": [
+      {
+        "className": "ContactApi",
+        "file": "src/helpers/api/ContactApi.ts",
+        "newMethods": [
+          "send",
+          "getById"
+        ],
+        "reusedFrom": [
+          "BaseApi"
+        ]
+      },
+      {
+        "className": "AuthApi",
+        "file": "src/helpers/api/AuthApi.ts",
+        "newMethods": [
+          "login",
+          "getToken"
+        ],
+        "reusedFrom": [
+          "BaseApi"
+        ]
+      }
+    ]
+  }
+}

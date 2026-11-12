@@ -1,0 +1,15 @@
+id: no-status-literal-in-assert
+message: "HTTP status literal in an assertion. Use the HttpStatus enum (AGENTS.md: no literals where an enum exists)."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.ts
+rule:
+  any:
+    - pattern: expect($R.status()).toBe($N)
+    - pattern: expect($R.status(), $M).toBe($N)
+    - pattern: expect($R.status()).toEqual($N)
+    - pattern: expect($R.status(), $M).toEqual($N)
+constraints:
+  N:
+    kind: number

@@ -1,0 +1,11 @@
+id: expect-needs-message
+message: "`expect(x)` needs a description as its second argument so a failure explains itself."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.spec.ts
+rule:
+  pattern: expect($X)
+note: |
+  Prefer expect(rows, `Table should show ${expected} rows`).toHaveCount(expected)
+  over expect(rows).toHaveCount(expected).

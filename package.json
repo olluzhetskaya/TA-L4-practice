@@ -1,0 +1,45 @@
+{
+  "name": "ta-l4-practice",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "description": "TA Lead L4 practice — build an agentic pipeline that turns manual test cases into green Playwright API + UI specs against Toolshop.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint .",
+    "ast-grep": "bash tools/ast-grep/scan.sh",
+    "validate:push": "npm run schema && npm run typecheck && npm run lint && npm run ast-grep && npm run runGates -- --ci --no-lint",
+    "runGates": "tsx .agents/scripts/runGates-cli.ts",
+    "schema": "tsx .agents/manual-to-autotests-pipeline/schema-exports.ts",
+    "generate:types": "openapi-typescript \"${TOOLSHOP_API_URL:-https://api.practicesoftwaretesting.com}/docs\" -o src/types/generated/toolshop-api.d.ts",
+    "test": "playwright test",
+    "test:api": "playwright test --project=api",
+    "test:ui": "playwright test --project=ui",
+    "test:harness": "node --import tsx --test $(find .agents -name '*.test.ts')",
+    "eval": "tsx --env-file-if-exists=.env scripts/run-eval.ts",
+    "eval:goldens": "tsx --env-file-if-exists=.env scripts/verify-goldens.ts",
+    "hooks:install": "git config core.hooksPath .githooks"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "dotenv": "^18.0.6",
+    "zod": "^4.6.5"
+  },
+  "devDependencies": {
+    "@ast-grep/cli": "^0.51.2",
+    "@cursor/sdk": "^1.3.1",
+    "@eslint/js": "^10.0.1",
+    "@playwright/test": "^1.64.1",
+    "@types/node": "^26.6.4",
+    "eslint": "^10.12.0",
+    "eslint-plugin-playwright": "^2.12.1",
+    "eslint-plugin-sonarjs": "^4.2.2",
+    "globals": "^17.0.0",
+    "openapi-typescript": "^7.13.0",
+    "tsx": "^4.23.15",
+    "typescript": "^5.9.0",
+    "typescript-eslint": "^8.71.2"
+  }
+}

@@ -1,0 +1,12 @@
+id: no-manual-sleep
+message: "Manual setTimeout-based sleep. Use auto-retrying assertions or expect.poll."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.ts
+  - src/**/*.ts
+rule:
+  any:
+    - pattern: new Promise($R => setTimeout($R, $$$))
+    - pattern: new Promise($R => { setTimeout($R, $$$) })
+    - pattern: new Promise(($R) => setTimeout($R, $$$))

@@ -1,0 +1,19 @@
+id: no-css-selector-in-spec
+message: "CSS selector string inside a spec — move the locator into a page object and use a semantic getBy* locator."
+severity: error
+language: TypeScript
+files:
+  - tests/**/*.spec.ts
+rule:
+  kind: string_fragment
+  regex: '^(\.[a-zA-Z_][a-zA-Z0-9_\-]*|#[a-zA-Z_][a-zA-Z0-9_\-]*|\[[a-zA-Z-]+[=~^$*|]?|[a-z]+\[|[a-z]+\.[a-zA-Z_])'
+  inside:
+    kind: arguments
+    stopBy: end
+    inside:
+      kind: call_expression
+      has:
+        kind: member_expression
+        regex: '\.locator$'
+        stopBy: end
+      stopBy: end
