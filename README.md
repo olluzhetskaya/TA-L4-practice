@@ -167,7 +167,7 @@ Now compare two versions of one step's expected result:
 
 The first cannot be turned into an assertion: what does "works" check? The second names the status and the field, so the spec practically writes itself. A gate should tell the two apart.
 
-Our file is an *export*, not something we upload, so it stays plain JSON you could produce from Jira with one request; it is not a creation request (`POST /rest/api/2/issue`) and carries no server-generated fields. The schema parses the export and hands every gate and skill one flat shape: `{ ticket, testCases: [{ id, title, level, priority, acRefs, preconditions, steps: [{ action, data, expected }], notes }] }`.
+The file is not frozen: a person or the agent may refine it (sharpen a vague `expected result`, add a missing precondition, split a case). The input schema and gates run on every change through the stop hook, so whatever edits the file, the Jira/Xray shape and the rules above stay enforced.
 
 > **Think first.** You are handed a manual test case file. Before you read our list: what would you check, so that nothing downstream has to guess? Write down your own list, then compare it with the one below. What would you add?
 
