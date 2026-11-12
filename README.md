@@ -139,16 +139,6 @@ The full folder map is under [Layout](#layout).
   }
 }
 ```
-
-| Jira / Xray field | Means | Notes |
-|---|---|---|
-| `key` | test case id (`TC-n`) | the id the spec's `testCase('TC-n')` annotation refers to |
-| `fields.summary` | title | the spec's `test()` title must equal it |
-| `fields.components[0].name` | level: `api` or `ui` | Xray has no level; a component is a common convention |
-| `fields.labels` | acceptance criteria covered (`AC-n`) | Jira has no AC field; labels are the cheapest link |
-| `fields.issuelinks` | `Test` link to the story, `Precondition` links | preconditions are separate Jira issues in Xray; their summary is embedded in the link |
-| `fields.customfield_10004.steps[]` | `action`, `data`, `"expected result"` | the field id differs per Jira instance (look it up with `GET /rest/api/2/issue/<KEY>/editmeta`) |
-
 Now compare two versions of one step's expected result:
 
 ```json
