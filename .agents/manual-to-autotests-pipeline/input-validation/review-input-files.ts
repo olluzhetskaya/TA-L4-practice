@@ -1,12 +1,13 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { fail, fixRequired, pass, passFailFromSchema, toCheckResult, warn, type CheckResult, type GateResult } from '../../lib/gates/gateResults.ts'
+import { fail, fixRequired, gateFromProblems, pass, passFailFromSchema, toCheckResult, warn, type CheckResult, type GateResult } from '../../lib/gates/gateResults.ts'
 import { readOutputJson } from '../../lib/files.ts'
 import { STRATEGY_FILE, ticketFromFileName } from '../paths.ts'
 import { testCaseFileSchema, type StoryContext, type TestCaseFile } from './input-schemas.ts'
 import { VALIDATION } from '../../harness-config.ts'
 import { loadStory, type StoryLoad } from './load-story.ts'
 
+const OBJECTIVE_PREFIX = /^Verify that /
 const VAGUE_EXPECTED = /^(works?|ok|okay|correct(ly)?|success(ful(ly)?)?|as expected|fine|passes?)\.?$/i
 
 export function ticketGate(file: string, data: TestCaseFile): GateResult {
@@ -44,6 +45,16 @@ export function concreteExpectedGate(data: TestCaseFile): GateResult {
     : fail('concrete-expected', `expected result is too vague to assert on: ${vague.join(', ')}`)
 }
 
+/** The summary is the test objective: "Verify that <subject> <does what> <with which outcome>". The spec title repeats it. */
+export function objectiveGate(data: TestCaseFile): GateResult {
+  const problems = data.testCases.flatMap(tc => {
+    if (!OBJECTIVE_PREFIX.test(tc.title)) return [`${tc.id} must start with "Verify that"`]
+    const words = tc.title.trim().split(/\s+/).length
+    return words < VALIDATION.minObjectiveWords ? [`${tc.id} is too short to state a subject, an action and an outcome`] : []
+  })
+  return gateFromProblems('objective', problems)
+}
+
 export function levelCoverageGate(data: TestCaseFile): GateResult {
   const levels = new Set(data.testCases.map(tc => tc.level))
   return levels.size > 1
@@ -74,6 +85,7 @@ export function reviewInputFile(file: string, opts: { root?: string } = {}): Che
     ticketGate(file, value),
     storyGate(load),
     acRefsGate(value, story),
+    objectiveGate(value),
     concreteExpectedGate(value),
     levelCoverageGate(value),
     strategyGate(root),
