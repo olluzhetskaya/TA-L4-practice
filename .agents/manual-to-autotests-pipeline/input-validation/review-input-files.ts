@@ -9,20 +9,20 @@ import { loadStory, type StoryLoad } from './load-story.ts'
 
 const VAGUE_EXPECTED = /^(works?|ok|okay|correct(ly)?|success(ful(ly)?)?|as expected|fine|passes?)\.?$/i
 
-export function ticketGate(file: string, data: TestCaseFile): GateResult {
+function ticketGate(file: string, data: TestCaseFile): GateResult {
   const fromName = ticketFromFileName(file)
   return fromName === data.ticket
     ? pass('ticket-match')
     : fail('ticket-match', `file name says ${fromName ?? '(none)'} but "ticket" is ${data.ticket}`)
 }
 
-export function storyGate(load: StoryLoad): GateResult {
+function storyGate(load: StoryLoad): GateResult {
   if (load.status === 'missing') return warn('story', 'no story found — continuing from the test cases alone (story is optional)')
   if (load.status === 'invalid') return fail('story', load.detail)
   return pass('story')
 }
 
-export function acRefsGate(data: TestCaseFile, story: StoryContext | undefined): GateResult {
+function acRefsGate(data: TestCaseFile, story: StoryContext | undefined): GateResult {
   if (!story) return pass('ac-refs')
   const known = new Set(story.acIds)
   const bad = data.testCases.flatMap(tc =>
@@ -31,7 +31,7 @@ export function acRefsGate(data: TestCaseFile, story: StoryContext | undefined):
   return bad.length === 0 ? pass('ac-refs') : fail('ac-refs', `acRefs not found in the story: ${bad.join(', ')}`)
 }
 
-export function concreteExpectedGate(data: TestCaseFile): GateResult {
+function concreteExpectedGate(data: TestCaseFile): GateResult {
   const vague = data.testCases.flatMap(tc =>
     tc.steps.flatMap((step, i) =>
       step.expected.trim().length < VALIDATION.minExpectedLength || VAGUE_EXPECTED.test(step.expected.trim())
@@ -44,14 +44,14 @@ export function concreteExpectedGate(data: TestCaseFile): GateResult {
     : fail('concrete-expected', `expected result is too vague to assert on: ${vague.join(', ')}`)
 }
 
-export function levelCoverageGate(data: TestCaseFile): GateResult {
+function levelCoverageGate(data: TestCaseFile): GateResult {
   const levels = new Set(data.testCases.map(tc => tc.level))
   return levels.size > 1
     ? pass('level-coverage')
     : warn('level-coverage', `only ${[...levels].join('')} test cases — TEST-STRATEGY §1 expects complementary API + UI coverage`)
 }
 
-export function strategyGate(root: string): GateResult {
+function strategyGate(root: string): GateResult {
   return existsSync(join(root, STRATEGY_FILE))
     ? pass('strategy')
     : fail('strategy', `${STRATEGY_FILE} is missing — the pipeline must read the test strategy before analysing the SUT`)

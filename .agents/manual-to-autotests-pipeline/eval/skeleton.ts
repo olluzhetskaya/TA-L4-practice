@@ -21,7 +21,7 @@ const REFERENCE_OUTPUT = new RegExp(
   `^(tests/(api|ui)/${REFERENCE_TICKET}\\.[^/]+\\.spec\\.ts|${DIRS.artifacts}/explore-${REFERENCE_TICKET}\\.json)$`,
 )
 
-export const skeletonOverlayDir = (repoRoot: string) => join(repoRoot, DIRS.evalSkeleton)
+const skeletonOverlayDir = (repoRoot: string) => join(repoRoot, DIRS.evalSkeleton)
 
 /**
  * Turn a project copy at `root` into the neutral skeleton: the framework core

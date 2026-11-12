@@ -23,7 +23,7 @@ const stepSchema = z.object({
 })
 
 /** What the pipeline works with, whatever the Jira export looked like. */
-export const manualTestCaseSchema = z.object({
+const manualTestCaseSchema = z.object({
   id: z.string().regex(TC_ID_PATTERN, 'id must look like TC-1'),
   title: z.string().min(1),
   level: testLevelSchema,
@@ -68,7 +68,7 @@ const normalisedFileSchema = z
  *   fields.issuelinks        link type "Test" → the story; link type "Precondition" → a precondition issue
  *   fields.customfield_10004 Xray "Manual Test Steps" (the id differs per Jira instance)
  */
-export const MANUAL_STEPS_FIELD = 'customfield_10004'
+const MANUAL_STEPS_FIELD = 'customfield_10004'
 const STORY_LINK = 'Test'
 const PRECONDITION_LINK = 'Precondition'
 

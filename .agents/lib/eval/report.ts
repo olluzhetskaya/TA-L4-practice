@@ -1,7 +1,7 @@
 import type { TaskOutcome } from './run-task.ts'
 import type { SuiteScore } from './score.ts'
 
-export const percent = (rate: number): string => `${(rate * 100).toFixed(1)}%`
+const percent = (rate: number): string => `${(rate * 100).toFixed(1)}%`
 
 const failing = (checks: { name: string; status: string; detail?: string }[]): string =>
   checks

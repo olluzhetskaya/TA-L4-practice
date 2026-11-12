@@ -7,7 +7,7 @@ import { DIRS, FILE_PATTERNS } from '../../harness-config.ts'
 import { levelFromSpecName } from '../specs-validation/spec-source.ts'
 import { FEATURE_FILES, NEUTRALISED_FILES, REFERENCE_TICKET } from './skeleton.ts'
 
-export const datasetDir = (repoRoot: string) => join(repoRoot, DIRS.evalDataset)
+const datasetDir = (repoRoot: string) => join(repoRoot, DIRS.evalDataset)
 
 /** One eval ticket: inputs the pipeline starts from and the golden outputs to compare against. */
 export type EvalItem = {

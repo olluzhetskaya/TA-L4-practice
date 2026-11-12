@@ -10,7 +10,7 @@ export type SchemaExport = {
   io?: 'input' | 'output'
 }
 
-export function renderSchema({ title, schema, io = 'output' }: SchemaExport): string {
+function renderSchema({ title, schema, io = 'output' }: SchemaExport): string {
   const json = z.toJSONSchema(schema, { io })
   return JSON.stringify({ title, ...json }, null, 2) + '\n'
 }

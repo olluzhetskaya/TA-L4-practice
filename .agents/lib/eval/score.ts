@@ -22,7 +22,7 @@ export type SuiteScore = {
 
 const ratio = (part: number, total: number): number => (total === 0 ? 0 : part / total)
 
-export function scoreChecks(checks: Check[]): TaskScore {
+function scoreChecks(checks: Check[]): TaskScore {
   const passCount = checks.filter(c => c.status === 'pass').length
   return {
     passed: checks.length > 0 && checks.every(c => c.status !== 'fail'),
