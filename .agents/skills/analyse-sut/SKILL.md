@@ -11,13 +11,14 @@ Do not invent a locator or a status code you did not observe. If the session can
 
 ## Inputs
 
-- `.agents/test-cases/<TICKET>.json` — manual test cases (schema: `.agents/schemas/test-cases.schema.json`)
-- `.agents/stories/<TICKET>.md|json` — optional context for the acceptance criteria
+- `.agents/manual-to-autotests-pipeline/test-cases/<TICKET>.json` — manual test cases (schema: `.agents/manual-to-autotests-pipeline/input-validation/test-cases.schema.json`)
+  A Jira/Xray export: one issue per test case. `key` is the test case id, `fields.summary` its title, `fields.components[0].name` its level (`api` or `ui`), `fields.labels` the acceptance criteria it covers, `fields.issuelinks` the story and the preconditions, and `fields.customfield_10004.steps[]` the steps (`action`, `data`, `expected result`).
+- `.agents/manual-to-autotests-pipeline/stories/<TICKET>.md|json` — optional context for the acceptance criteria
 - `wiki/TEST-STRATEGY.md` — **read first**: §1–§3 (what each level owns) and §6 (contracts come from the live SUT)
 
 ## Output
 
-One file: `.agents/artifacts/explore-<TICKET>.json`, matching `references/exploration.schema.json`. Read that schema before writing.
+One file: `.agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json`, matching `references/exploration.schema.json`. Read that schema before writing.
 
 ## Supporting skills
 
@@ -57,7 +58,7 @@ Use a named `playwright-cli` session so state is isolated:
 
 ```bash
 playwright-cli -s=explore-<TICKET> open <uiURL>/<path>
-playwright-cli -s=explore-<TICKET> snapshot --filename=.agents/artifacts/_snap-<TICKET>.yaml
+playwright-cli -s=explore-<TICKET> snapshot --filename=.agents/manual-to-autotests-pipeline/artifacts/_snap-<TICKET>.yaml
 ```
 
 Single-page apps render after load — snapshot again if the page looks empty.
@@ -83,7 +84,7 @@ Whenever the live SUT differs from a test case step, add a `findings[]` entry wi
 ### 6. Write the artifact and run the gate
 
 ```bash
-npm run runGates -- .agents/artifacts/explore-<TICKET>.json
+npm run runGates -- .agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json
 ```
 
 Fix every failing gate and re-run. The Cursor stop hook runs the same gate.

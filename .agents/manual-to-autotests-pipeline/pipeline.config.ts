@@ -39,7 +39,7 @@ export const STAGES: Stage[] = [
     list: root => listFiles(root, DIRS.testCases, /\.json$/),
     review: (file, { root }) => reviewInputFile(file, { root }),
     followupRules: [
-      '- Test cases follow manualTestCaseSchema: id TC-n, level api|ui, acRefs, steps with action/data/expected.',
+      '- Test cases are a Jira/Xray export: key TC-n, one component api|ui, AC-n labels, a link to the story, steps with action/data/"expected result".',
       '- "expected" must be concrete enough to assert on — never "works" or "correct".',
       '- wiki/TEST-STRATEGY.md must exist before analysis starts.',
     ],

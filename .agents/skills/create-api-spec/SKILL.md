@@ -11,10 +11,10 @@ Automate the `level: "api"` test cases of a ticket. The manual test case defines
 
 1. `wiki/TEST-STRATEGY.md` — §2 (API owns contracts, rules, boundaries, persistence), §4, §5, §7
 2. `AGENTS.md` — coding conventions (enforced by eslint + ast-grep)
-3. `.agents/test-cases/<TICKET>.json` — the api test cases
-4. `.agents/artifacts/explore-<TICKET>.json` — `apiCalls`, `scenarios`, `findings` for those test cases
+3. `.agents/manual-to-autotests-pipeline/test-cases/<TICKET>.json` — the api test cases: the Jira/Xray issues whose `fields.components[0].name` is `api` (steps in `fields.customfield_10004.steps[]`)
+4. `.agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json` — `apiCalls`, `scenarios`, `findings` for those test cases
 
-If the artifact is missing or fails `npm run runGates -- .agents/artifacts/explore-<TICKET>.json`, stop: run `analyse-sut` first.
+If the artifact is missing or fails `npm run runGates -- .agents/manual-to-autotests-pipeline/artifacts/explore-<TICKET>.json`, stop: run `analyse-sut` first.
 
 ## Supporting skills
 

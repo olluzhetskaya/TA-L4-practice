@@ -5,7 +5,7 @@ import { storyJsonSchema, testCaseFileSchema } from './input-validation/input-sc
 import { explorationSchema } from '../skills/analyse-sut/scripts/schema.ts'
 
 export const SCHEMA_EXPORTS: SchemaExport[] = [
-  { out: PATHS.testCasesSchema, title: 'Manual test cases (pipeline input)', schema: testCaseFileSchema },
+  { out: PATHS.testCasesSchema, title: 'Manual test cases (pipeline input)', schema: testCaseFileSchema, io: 'input' },
   { out: PATHS.storySchema, title: 'Story (optional JSON input)', schema: storyJsonSchema },
   { out: PATHS.explorationSchema, title: 'SUT exploration artifact (analyse-sut output)', schema: explorationSchema },
 ]

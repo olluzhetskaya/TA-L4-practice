@@ -56,7 +56,7 @@ Think of the repo in two layers: the **starting point** you are handed, and the 
 
 | Given | Where |
 |---|---|
-| Story + manual test cases for `TOOL-1` (contact form) | `.agents/manual-to-autotests-pipeline/stories/TOOL-1.md`, `.../test-cases/TOOL-1.json` |
+| Story + manual test cases for `TOOL-1` (contact form); the test cases are a Jira/Xray export | `.agents/manual-to-autotests-pipeline/stories/TOOL-1.md`, `.../test-cases/TOOL-1.json` |
 | Test strategy the agent must follow. `wiki/` is the project's context folder: the agent reads it before it works, so put anything it should know there (domain glossary, environments, naming rules, known bugs, architecture notes) next to the strategy | `wiki/TEST-STRATEGY.md` |
 | Framework core the specs sit on: env config and timeouts, typed API base client + `AuthApi`/`ContactApi`, `readJson` (Zod-parsed responses), `BasePage` + `ContactPage`, test data builders and enums, fixtures, tags, generated OpenAPI types | `src/`, `tests/fixtures/`, `playwright.config.ts` |
 | Supporting [Agent Skills](https://agentskills.io/home) the spec skills delegate to: `playwright-cli`, `probe-sut`, `create-locators`, `pom-builder`, `data-layer`, `test-data-state-management`, `test-stability`, `playwright-annotations`, `typescript-types`, `architecture-best-practices`, `code-review`, `github-ci` | `.agents/skills/` |
@@ -109,28 +109,70 @@ The full folder map is under [Layout](#layout).
 
 **Why.** Everything downstream trusts the test cases. A vague expected result cannot become an assertion, and a dangling requirement link means a test nobody can trace. Catching this at the door costs one failing command; catching it after the spec is written costs a rewrite.
 
-**Example.** Same step, two versions:
+**Example.** The input is what Jira and [Xray](https://docs.getxray.app/space/XRAY/301474262/Tests+-+REST) give you: one Jira issue of type *Test* per manual test case, exported with a search (`GET /rest/api/2/search?jql=issue in linkedIssues(TOOL-1)`). This is one step of `TC-1`, trimmed to the fields we use:
 
 ```json
-{ "action": "Send a message", "data": "valid message", "expected": "works" }
+{
+  "key": "TC-1",
+  "fields": {
+    "issuetype": { "name": "Test" },
+    "summary": "Verify that the contact API rejects invalid messages and accepts a boundary-length message",
+    "priority": { "name": "High" },
+    "components": [{ "name": "api" }],
+    "labels": ["AC-4", "AC-5", "AC-6", "AC-2"],
+    "issuelinks": [
+      { "type": { "name": "Test" }, "outwardIssue": { "key": "TOOL-1", "fields": { "summary": "Contact customer service from the storefront" } } },
+      { "type": { "name": "Precondition" }, "inwardIssue": { "key": "PRE-1", "fields": { "summary": "The contact endpoint POST /messages is reachable without authentication" } } }
+    ],
+    "customfield_10004": {
+      "steps": [
+        {
+          "index": 3,
+          "fields": {
+            "action": "Send a contact message of 251 characters",
+            "data": "message: 251 x 'x'",
+            "expected result": "HTTP 422; the validation error names the message field"
+          }
+        }
+      ]
+    }
+  }
+}
+```
+
+| Jira / Xray field | Means | Notes |
+|---|---|---|
+| `key` | test case id (`TC-n`) | the id the spec's `testCase('TC-n')` annotation refers to |
+| `fields.summary` | title | the spec's `test()` title must equal it |
+| `fields.components[0].name` | level: `api` or `ui` | Xray has no level; a component is a common convention |
+| `fields.labels` | acceptance criteria covered (`AC-n`) | Jira has no AC field; labels are the cheapest link |
+| `fields.issuelinks` | `Test` link to the story, `Precondition` links | preconditions are separate Jira issues in Xray; their summary is embedded in the link |
+| `fields.customfield_10004.steps[]` | `action`, `data`, `"expected result"` | the field id differs per Jira instance (look it up with `GET /rest/api/2/issue/<KEY>/editmeta`) |
+
+Now compare two versions of one step's expected result:
+
+```json
+{ "action": "Send a message", "data": "valid message", "expected result": "works" }
 ```
 
 ```json
 {
   "action": "Send a contact message of 251 characters",
   "data": "message: 251 x 'x'",
-  "expected": "HTTP 422; the validation error names the message field"
+  "expected result": "HTTP 422; the validation error names the message field"
 }
 ```
 
 The first cannot be turned into an assertion: what does "works" check? The second names the status and the field, so the spec practically writes itself. A gate should tell the two apart.
 
+Our file is an *export*, not something we upload, so it stays plain JSON you could produce from Jira with one request; it is not a creation request (`POST /rest/api/2/issue`) and carries no server-generated fields. The schema parses the export and hands every gate and skill one flat shape: `{ ticket, testCases: [{ id, title, level, priority, acRefs, preconditions, steps: [{ action, data, expected }], notes }] }`.
+
 > **Think first.** You are handed a manual test case file. Before you read our list: what would you check, so that nothing downstream has to guess? Write down your own list, then compare it with the one below. What would you add?
 
 | Question to ask of the input | Our gate | A failure looks like |
 |---|---|---|
-| Is the file shaped like a test case at all (ids, level, steps, expected)? | `schema` | `testCases.0.level: Invalid option` |
-| Does the file belong to the ticket its name says? | `ticket-match` | `file name says TOOL-2 but "ticket" is TOOL-1` |
+| Is the file shaped like a Jira/Xray test export at all (key, summary, component, steps, expected result)? | `schema` | `issues.0.fields.components: Invalid input: expected array` |
+| Does the file belong to the story its name says (every test links to one story, and the same one)? | `ticket-match`, schema | `file name says TOOL-2 but "ticket" is TOOL-1` |
 | Does every requirement link point to something real? | `ac-refs` | `acRefs not found in the story: TC-1 → AC-9` |
 | Can every expected result become an assertion? | `concrete-expected` | `expected result is too vague to assert on: TC-2 step 3` |
 | Are ids and titles unique (one title ↔ one test)? | schema refinement | `duplicate id TC-1` |
@@ -138,7 +180,7 @@ The first cannot be turned into an assertion: what does "works" check? The secon
 | Do the cases cover both levels the strategy asks for? | `level-coverage` | warn: `only api test cases` |
 | Is the strategy the agent must follow present? | `strategy` | `wiki/TEST-STRATEGY.md is missing` |
 
-Ideas we did not build, if you want a harder version: an API step whose `expected` names no status code; a UI step whose `data` names a field the story never mentions; a test case with no precondition when the steps need an authenticated user.
+Ideas we did not build, if you want a harder version: an API step whose `expected result` names no status code; a UI step whose `data` names a field the story never mentions; a test case with no precondition when the steps need an authenticated user.
 
 This is also where the harness is born. You can't check anything without a way to express a result and a way to run it, so build the minimal core here and immediately point it at `TOOL-1.json`. Later phases grow the harness next to the first thing that needs each piece, with no big framework up front.
 
@@ -153,20 +195,27 @@ This is also where the harness is born. You can't check anything without a way t
 Make the schema reject bad data itself, so the gates have less to do. A few lines carry most of the idea:
 
 ```ts
-export const manualTestCaseSchema = z.object({
-  id: z.string().regex(TC_ID_PATTERN, 'id must look like TC-1'),   // shape, not just "a string"
-  level: z.enum(['api', 'ui']),                                    // closed set: "apiiii" fails here
-  acRefs: z.array(z.string().regex(AC_ID_PATTERN)).min(1),         // at least one requirement link
-  steps: z.array(stepSchema).min(1),                               // a test case without steps is not one
-  notes: z.string().nullable(),                                    // "none" is an explicit null, never an invented string
+const xrayTestSchema = z.object({
+  key: z.string().regex(TC_ID_PATTERN, 'key must look like TC-1'),              // shape, not just "a string"
+  fields: z.object({
+    issuetype: z.object({ name: z.literal('Test') }),                         // only Test issues, not Bugs or Stories
+    components: z.tuple([z.object({ name: testLevelSchema })]),               // exactly one level; "apiiii" fails here
+    priority: z.object({ name: z.enum(['Highest', 'High', 'Medium', 'Low', 'Lowest']) }),
+    description: z.string().nullable(),                                       // "no notes" is an explicit null
+    [MANUAL_STEPS_FIELD]: z.object({ steps: z.array(xrayStepSchema).min(1) }), // a test case without steps is not one
+  }),
 })
+
+export const testCaseFileSchema = xrayExportSchema
+  .transform(({ issues }) => ({ ticket: storyKey(issues), testCases: issues.map(toManualTestCase) }))
+  .pipe(normalisedFileSchema)        // parse the export, then validate the flat shape the gates read
 ```
 
 The conventions behind it: fixed sets are `z.enum`; non-empty strings and id patterns are `.min(1)` / `.regex`; optional means *explicitly* optional; `.nullable()` is for "genuinely unknown" so the agent never has to invent a value; types come from `z.infer`, never a hand-written copy; parse with `safeParse`, never a cast or `any`. You can also consider `.strict()` objects so a typo'd key is an error instead of being dropped.
 
 `npm run schema` exports the Zod schemas as JSON Schema (`*.schema.json`), so editors and the agent can read the contract without running code.
 
-*Acceptance:* `npm run runGates -- .agents/manual-to-autotests-pipeline/test-cases/TOOL-1.json` passes. A copy with a vague `expected` or an unknown `AC-9` fails with a message an agent can act on. Write a passing and a failing fixture per gate (`node:test`).
+*Acceptance:* `npm run runGates -- .agents/manual-to-autotests-pipeline/test-cases/TOOL-1.json` passes. A copy with a vague `expected result` or an unknown `AC-9` fails with a message an agent can act on. Write a passing and a failing fixture per gate (`node:test`).
 
 ## Phase 2 — Analyse the SUT
 

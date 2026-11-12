@@ -33,37 +33,58 @@ describe('input hook', () => {
     assert.equal(gate('schema')?.status, 'fail')
   })
 
-  it('fails when a test case has no level', () => {
+  it('fails when a test case has no level component', () => {
     const data = readTc()
-    delete data.testCases[0].level
+    data.issues[0].fields.components = []
     writeTc(data)
-    assert.match(gate('schema')?.detail ?? '', /level/)
+    assert.match(gate('schema')?.detail ?? '', /components/)
+  })
+
+  it('fails when a test has no link to a story', () => {
+    const data = readTc()
+    data.issues[0].fields.issuelinks = []
+    writeTc(data)
+    assert.match(gate('schema')?.detail ?? '', /exactly one "Test" link/)
+  })
+
+  it('fails when tests link to different stories', () => {
+    const data = readTc()
+    data.issues[1].fields.issuelinks[0].outwardIssue.key = 'TOOL-9'
+    writeTc(data)
+    assert.match(gate('schema')?.detail ?? '', /tests TOOL-9/)
+  })
+
+  it('reads the steps in index order', () => {
+    const data = readTc()
+    data.issues[0].fields.customfield_10004.steps.reverse()
+    writeTc(data)
+    assert.equal(reviewInputFile(tcFile(), { root }).decision, 'continue')
   })
 
   it('fails on duplicate test case ids', () => {
     const data = readTc()
-    data.testCases[1].id = 'TC-1'
+    data.issues[1].key = 'TC-1'
     writeTc(data)
     assert.match(gate('schema')?.detail ?? '', /duplicate id/)
   })
 
   it('fails when the file name and ticket disagree', () => {
     const data = readTc()
-    data.ticket = 'TOOL-9'
+    for (const issue of data.issues) issue.fields.issuelinks[0].outwardIssue.key = 'TOOL-9'
     writeTc(data)
     assert.equal(gate('ticket-match')?.status, 'fail')
   })
 
   it('fails on vague expected results', () => {
     const data = readTc()
-    data.testCases[0].steps[0].expected = 'works'
+    data.issues[0].fields.customfield_10004.steps[0].fields['expected result'] = 'works'
     writeTc(data)
     assert.equal(gate('concrete-expected')?.status, 'fail')
   })
 
   it('fails when acRefs are not in the story', () => {
     const data = readTc()
-    data.testCases[0].acRefs = ['AC-99']
+    data.issues[0].fields.labels = ['AC-99']
     writeTc(data)
     assert.match(gate('ac-refs')?.detail ?? '', /AC-99/)
   })
@@ -97,7 +118,7 @@ describe('input hook', () => {
 
   it('warns when only one test level is present', () => {
     const data = readTc()
-    data.testCases = data.testCases.filter((tc: { level: string }) => tc.level === 'api')
+    data.issues = data.issues.filter((issue: { fields: { components: { name: string }[] } }) => issue.fields.components[0]?.name === 'api')
     writeTc(data)
     assert.equal(gate('level-coverage')?.status, 'warn')
   })

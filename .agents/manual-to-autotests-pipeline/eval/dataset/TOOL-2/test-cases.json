@@ -1,68 +1,212 @@
 {
-  "ticket": "TOOL-2",
-  "testCases": [
+  "issues": [
     {
-      "id": "TC-1",
-      "title": "Verify that the contact API rejects a sender name over the maximum length",
-      "level": "api",
-      "priority": "High",
-      "acRefs": ["AC-1"],
-      "preconditions": ["The contact endpoint POST /messages is reachable without authentication"],
-      "steps": [
-        {
-          "action": "Send a contact message whose name is 121 characters long",
-          "data": "name: 121 x 'x'; other fields valid",
-          "expected": "HTTP 422; the validation error names the name field"
+      "key": "TC-1",
+      "fields": {
+        "issuetype": {
+          "name": "Test"
+        },
+        "summary": "Verify that the contact API rejects a sender name over the maximum length",
+        "description": null,
+        "priority": {
+          "name": "High"
+        },
+        "components": [
+          {
+            "name": "api"
+          }
+        ],
+        "labels": [
+          "AC-1"
+        ],
+        "issuelinks": [
+          {
+            "type": {
+              "name": "Test",
+              "inward": "is tested by",
+              "outward": "tests"
+            },
+            "outwardIssue": {
+              "key": "TOOL-2",
+              "fields": {
+                "summary": "Contact service enforces field length limits"
+              }
+            }
+          },
+          {
+            "type": {
+              "name": "Precondition",
+              "inward": "is a precondition of",
+              "outward": "has precondition"
+            },
+            "inwardIssue": {
+              "key": "PRE-1",
+              "fields": {
+                "summary": "The contact endpoint POST /messages is reachable without authentication"
+              }
+            }
+          }
+        ],
+        "customfield_10004": {
+          "steps": [
+            {
+              "index": 1,
+              "fields": {
+                "action": "Send a contact message whose name is 121 characters long",
+                "data": "name: 121 x 'x'; other fields valid",
+                "expected result": "HTTP 422; the validation error names the name field"
+              }
+            }
+          ]
         }
-      ],
-      "notes": null
+      }
     },
     {
-      "id": "TC-2",
-      "title": "Verify that the contact API accepts a sender name of exactly the maximum length",
-      "level": "api",
-      "priority": "High",
-      "acRefs": ["AC-1"],
-      "preconditions": ["The contact endpoint POST /messages is reachable without authentication"],
-      "steps": [
-        {
-          "action": "Send a contact message whose name is exactly 120 characters long",
-          "data": "name: 120 x 'x'; other fields valid",
-          "expected": "The message is accepted and the response echoes the name with status NEW"
+      "key": "TC-2",
+      "fields": {
+        "issuetype": {
+          "name": "Test"
+        },
+        "summary": "Verify that the contact API accepts a sender name of exactly the maximum length",
+        "description": null,
+        "priority": {
+          "name": "High"
+        },
+        "components": [
+          {
+            "name": "api"
+          }
+        ],
+        "labels": [
+          "AC-1"
+        ],
+        "issuelinks": [
+          {
+            "type": {
+              "name": "Test",
+              "inward": "is tested by",
+              "outward": "tests"
+            },
+            "outwardIssue": {
+              "key": "TOOL-2",
+              "fields": {
+                "summary": "Contact service enforces field length limits"
+              }
+            }
+          },
+          {
+            "type": {
+              "name": "Precondition",
+              "inward": "is a precondition of",
+              "outward": "has precondition"
+            },
+            "inwardIssue": {
+              "key": "PRE-2",
+              "fields": {
+                "summary": "The contact endpoint POST /messages is reachable without authentication"
+              }
+            }
+          }
+        ],
+        "customfield_10004": {
+          "steps": [
+            {
+              "index": 1,
+              "fields": {
+                "action": "Send a contact message whose name is exactly 120 characters long",
+                "data": "name: 120 x 'x'; other fields valid",
+                "expected result": "The message is accepted and the response echoes the name with status NEW"
+              }
+            }
+          ]
         }
-      ],
-      "notes": null
+      }
     },
     {
-      "id": "TC-3",
-      "title": "Verify that the contact API enforces the email and subject length limits",
-      "level": "api",
-      "priority": "Medium",
-      "acRefs": ["AC-2", "AC-3"],
-      "preconditions": ["The contact endpoint POST /messages is reachable without authentication"],
-      "steps": [
-        {
-          "action": "Send a contact message with an email address of 257 characters",
-          "data": "email: 257 characters, ending in @example.com",
-          "expected": "HTTP 422; the validation error names the email field"
+      "key": "TC-3",
+      "fields": {
+        "issuetype": {
+          "name": "Test"
         },
-        {
-          "action": "Send a contact message with an email address of exactly 256 characters",
-          "data": "email: 256 characters, ending in @example.com",
-          "expected": "The message is accepted and the response echoes the email"
+        "summary": "Verify that the contact API enforces the email and subject length limits",
+        "description": null,
+        "priority": {
+          "name": "Medium"
         },
-        {
-          "action": "Send a contact message with a subject of 121 characters",
-          "data": "subject: 121 x 's'",
-          "expected": "HTTP 422; the validation error names the subject field"
-        },
-        {
-          "action": "Send a contact message with a subject of exactly 120 characters",
-          "data": "subject: 120 x 's'",
-          "expected": "The message is accepted and the response echoes the subject"
+        "components": [
+          {
+            "name": "api"
+          }
+        ],
+        "labels": [
+          "AC-2",
+          "AC-3"
+        ],
+        "issuelinks": [
+          {
+            "type": {
+              "name": "Test",
+              "inward": "is tested by",
+              "outward": "tests"
+            },
+            "outwardIssue": {
+              "key": "TOOL-2",
+              "fields": {
+                "summary": "Contact service enforces field length limits"
+              }
+            }
+          },
+          {
+            "type": {
+              "name": "Precondition",
+              "inward": "is a precondition of",
+              "outward": "has precondition"
+            },
+            "inwardIssue": {
+              "key": "PRE-3",
+              "fields": {
+                "summary": "The contact endpoint POST /messages is reachable without authentication"
+              }
+            }
+          }
+        ],
+        "customfield_10004": {
+          "steps": [
+            {
+              "index": 1,
+              "fields": {
+                "action": "Send a contact message with an email address of 257 characters",
+                "data": "email: 257 characters, ending in @example.com",
+                "expected result": "HTTP 422; the validation error names the email field"
+              }
+            },
+            {
+              "index": 2,
+              "fields": {
+                "action": "Send a contact message with an email address of exactly 256 characters",
+                "data": "email: 256 characters, ending in @example.com",
+                "expected result": "The message is accepted and the response echoes the email"
+              }
+            },
+            {
+              "index": 3,
+              "fields": {
+                "action": "Send a contact message with a subject of 121 characters",
+                "data": "subject: 121 x 's'",
+                "expected result": "HTTP 422; the validation error names the subject field"
+              }
+            },
+            {
+              "index": 4,
+              "fields": {
+                "action": "Send a contact message with a subject of exactly 120 characters",
+                "data": "subject: 120 x 's'",
+                "expected result": "The message is accepted and the response echoes the subject"
+              }
+            }
+          ]
         }
-      ],
-      "notes": null
+      }
     }
   ]
 }

@@ -1,42 +1,134 @@
 {
-  "ticket": "TOOL-3",
-  "testCases": [
+  "issues": [
     {
-      "id": "TC-1",
-      "title": "Verify that searching by keyword lists the matching products",
-      "level": "ui",
-      "priority": "High",
-      "acRefs": ["AC-1"],
-      "preconditions": ["The visitor is on the storefront home page"],
-      "steps": [
-        {
-          "action": "Search for the keyword \"pliers\"",
-          "data": "pliers",
-          "expected": "The heading \"Searched for: pliers\" is displayed"
+      "key": "TC-1",
+      "fields": {
+        "issuetype": {
+          "name": "Test"
         },
-        {
-          "action": "Compare the listed products with the catalogue search for the same keyword",
-          "data": "-",
-          "expected": "The page lists exactly the product names the catalogue search returns for \"pliers\", in the same order"
+        "summary": "Verify that searching by keyword lists the matching products",
+        "description": "The expected product list comes from the catalogue search API, not from a hard-coded list.",
+        "priority": {
+          "name": "High"
+        },
+        "components": [
+          {
+            "name": "ui"
+          }
+        ],
+        "labels": [
+          "AC-1"
+        ],
+        "issuelinks": [
+          {
+            "type": {
+              "name": "Test",
+              "inward": "is tested by",
+              "outward": "tests"
+            },
+            "outwardIssue": {
+              "key": "TOOL-3",
+              "fields": {
+                "summary": "Search products by keyword"
+              }
+            }
+          },
+          {
+            "type": {
+              "name": "Precondition",
+              "inward": "is a precondition of",
+              "outward": "has precondition"
+            },
+            "inwardIssue": {
+              "key": "PRE-1",
+              "fields": {
+                "summary": "The visitor is on the storefront home page"
+              }
+            }
+          }
+        ],
+        "customfield_10004": {
+          "steps": [
+            {
+              "index": 1,
+              "fields": {
+                "action": "Search for the keyword \"pliers\"",
+                "data": "pliers",
+                "expected result": "The heading \"Searched for: pliers\" is displayed"
+              }
+            },
+            {
+              "index": 2,
+              "fields": {
+                "action": "Compare the listed products with the catalogue search for the same keyword",
+                "data": "-",
+                "expected result": "The page lists exactly the product names the catalogue search returns for \"pliers\", in the same order"
+              }
+            }
+          ]
         }
-      ],
-      "notes": "The expected product list comes from the catalogue search API, not from a hard-coded list."
+      }
     },
     {
-      "id": "TC-2",
-      "title": "Verify that a search without matches shows the empty state",
-      "level": "ui",
-      "priority": "Medium",
-      "acRefs": ["AC-2"],
-      "preconditions": ["The visitor is on the storefront home page"],
-      "steps": [
-        {
-          "action": "Search for a keyword that matches nothing",
-          "data": "zzzzzz",
-          "expected": "The heading \"Searched for: zzzzzz\" and the message \"There are no products found.\" are displayed"
+      "key": "TC-2",
+      "fields": {
+        "issuetype": {
+          "name": "Test"
+        },
+        "summary": "Verify that a search without matches shows the empty state",
+        "description": null,
+        "priority": {
+          "name": "Medium"
+        },
+        "components": [
+          {
+            "name": "ui"
+          }
+        ],
+        "labels": [
+          "AC-2"
+        ],
+        "issuelinks": [
+          {
+            "type": {
+              "name": "Test",
+              "inward": "is tested by",
+              "outward": "tests"
+            },
+            "outwardIssue": {
+              "key": "TOOL-3",
+              "fields": {
+                "summary": "Search products by keyword"
+              }
+            }
+          },
+          {
+            "type": {
+              "name": "Precondition",
+              "inward": "is a precondition of",
+              "outward": "has precondition"
+            },
+            "inwardIssue": {
+              "key": "PRE-2",
+              "fields": {
+                "summary": "The visitor is on the storefront home page"
+              }
+            }
+          }
+        ],
+        "customfield_10004": {
+          "steps": [
+            {
+              "index": 1,
+              "fields": {
+                "action": "Search for a keyword that matches nothing",
+                "data": "zzzzzz",
+                "expected result": "The heading \"Searched for: zzzzzz\" and the message \"There are no products found.\" are displayed"
+              }
+            }
+          ]
         }
-      ],
-      "notes": null
+      }
     }
   ]
 }

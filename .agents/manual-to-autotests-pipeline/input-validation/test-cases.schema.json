@@ -3,105 +3,229 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "type": "object",
   "properties": {
-    "ticket": {
-      "type": "string",
-      "pattern": "^[A-Z][A-Z0-9]+-\\d+$"
-    },
-    "testCases": {
+    "issues": {
       "minItems": 1,
       "type": "array",
       "items": {
         "type": "object",
         "properties": {
-          "id": {
+          "key": {
             "type": "string",
             "pattern": "^TC-\\d+$"
           },
-          "title": {
-            "type": "string",
-            "minLength": 1
-          },
-          "level": {
-            "type": "string",
-            "enum": [
-              "api",
-              "ui"
-            ]
-          },
-          "priority": {
-            "type": "string",
-            "enum": [
-              "Critical",
-              "High",
-              "Medium",
-              "Low"
-            ]
-          },
-          "acRefs": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "pattern": "^AC-\\d+$"
-            }
-          },
-          "preconditions": {
-            "type": "array",
-            "items": {
-              "type": "string"
-            }
-          },
-          "steps": {
-            "minItems": 1,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "action": {
-                  "type": "string",
-                  "minLength": 1
+          "fields": {
+            "type": "object",
+            "properties": {
+              "issuetype": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "const": "Test"
+                  }
                 },
-                "data": {
-                  "type": "string",
-                  "minLength": 1
+                "required": [
+                  "name"
+                ]
+              },
+              "summary": {
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "priority": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "enum": [
+                      "Highest",
+                      "High",
+                      "Medium",
+                      "Low",
+                      "Lowest"
+                    ]
+                  }
                 },
-                "expected": {
-                  "type": "string",
-                  "minLength": 1
+                "required": [
+                  "name"
+                ]
+              },
+              "components": {
+                "type": "array",
+                "prefixItems": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "enum": [
+                          "api",
+                          "ui"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "name"
+                    ]
+                  }
+                ],
+                "items": false,
+                "minItems": 1,
+                "maxItems": 1
+              },
+              "labels": {
+                "type": "array",
+                "items": {
+                  "type": "string"
                 }
               },
-              "required": [
-                "action",
-                "data",
-                "expected"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "notes": {
-            "type": [
-              "string",
-              "null"
+              "issuelinks": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "type": {
+                      "type": "object",
+                      "properties": {
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "name"
+                      ]
+                    },
+                    "outwardIssue": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "fields": {
+                          "type": "object",
+                          "properties": {
+                            "summary": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "summary"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "fields"
+                      ]
+                    },
+                    "inwardIssue": {
+                      "type": "object",
+                      "properties": {
+                        "key": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "fields": {
+                          "type": "object",
+                          "properties": {
+                            "summary": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "summary"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "key",
+                        "fields"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "type"
+                  ]
+                }
+              },
+              "customfield_10004": {
+                "type": "object",
+                "properties": {
+                  "steps": {
+                    "minItems": 1,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "index": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "fields": {
+                          "type": "object",
+                          "properties": {
+                            "action": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "data": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "expected result": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "action",
+                            "data",
+                            "expected result"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "index",
+                        "fields"
+                      ]
+                    }
+                  }
+                },
+                "required": [
+                  "steps"
+                ]
+              }
+            },
+            "required": [
+              "issuetype",
+              "summary",
+              "description",
+              "priority",
+              "components",
+              "labels",
+              "issuelinks",
+              "customfield_10004"
             ]
           }
         },
         "required": [
-          "id",
-          "title",
-          "level",
-          "priority",
-          "acRefs",
-          "preconditions",
-          "steps",
-          "notes"
-        ],
-        "additionalProperties": false
+          "key",
+          "fields"
+        ]
       }
     }
   },
   "required": [
-    "ticket",
-    "testCases"
-  ],
-  "additionalProperties": false
+    "issues"
+  ]
 }
