@@ -6,7 +6,6 @@ import {
   assertionParityCheck,
   bugMarkingCheck,
   noDisabledTestsCheck,
-  noHardcodedTestDataCheck,
   statusParityCheck,
   type SpecCheck,
 } from './spec-checks.ts'
@@ -91,21 +90,6 @@ describe('statusParityCheck', () => {
 
   it('leaves cases the agent did not write to the coverage gate', () => {
     assert.equal(status(statusParityCheck, against('')), 'pass')
-  })
-})
-
-describe('noHardcodedTestDataCheck', () => {
-  it('allows reporting strings and fixture-exported values', () => {
-    const source = `import { Data, expect, test, testCase } from '@fixtures'\n${test(
-      'TC-1',
-      "test.step('Verify that send data', async () => { expect(Data.actual, 'value should match').toBe(Data.expected) })",
-    )}`
-    assert.equal(status(noHardcodedTestDataCheck, contextFor(source)), 'pass')
-  })
-
-  it('rejects inline payload and expected values', () => {
-    const source = test('TC-1', "send({ email: 'inline@example.com' }); expect(result, 'result').toBe(0)")
-    assert.equal(status(noHardcodedTestDataCheck, contextFor(source)), 'fail')
   })
 })
 

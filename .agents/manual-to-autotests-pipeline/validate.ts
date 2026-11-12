@@ -23,6 +23,7 @@ import { artifactPath, ticketFromFileName } from './paths.ts'
 import {
   coverageGate,
   manualStepNamesGate,
+  noHardcodedTestDataGate,
   stepNamesGate,
   traceGate,
 } from './specs-validation/spec-gates.ts'
@@ -51,7 +52,7 @@ const specGates = (root: string, files: string[], testCases: TestCaseFile, compl
   if (files.length === 0) return complete ? [fail('specs', `no spec file for ${testCases.ticket} under tests/`)] : []
   const perFile = files.map(file => {
     const source = readFileSync(join(root, file), 'utf8')
-    return { file, tests: readSpecTests(source) }
+    return { file, source, tests: readSpecTests(source) }
   })
   return [
     ...perFile.flatMap(({ file, tests }) =>
@@ -61,6 +62,7 @@ const specGates = (root: string, files: string[], testCases: TestCaseFile, compl
         manualStepNamesGate(tests, testCases),
       ].map(g => ({ ...g, gate: `${file}: ${g.gate}` })),
     ),
+    noHardcodedTestDataGate(perFile),
     ...(complete ? [coverageGate(perFile.flatMap(item => item.tests), testCases)] : []),
   ]
 }

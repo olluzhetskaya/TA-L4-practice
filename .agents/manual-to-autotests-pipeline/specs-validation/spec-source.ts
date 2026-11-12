@@ -71,6 +71,36 @@ function readTest(call: ts.CallExpression, sf: ts.SourceFile): SpecTest {
 
 const parse = (source: string) => ts.createSourceFile('spec.ts', source, ts.ScriptTarget.Latest, true)
 
+const callName = (call: ts.CallExpression, sf: ts.SourceFile) => call.expression.getText(sf)
+
+function directArgumentOf(node: ts.Node, expectedCall: string, index: number, sf: ts.SourceFile): boolean {
+  return (
+    ts.isCallExpression(node.parent) &&
+    callName(node.parent, sf) === expectedCall &&
+    node.parent.arguments[index]?.pos === node.pos
+  )
+}
+
+function insideAnnotationPush(node: ts.Node, sf: ts.SourceFile): boolean {
+  for (let current = node.parent; current; current = current.parent)
+    if (ts.isCallExpression(current) && callName(current, sf).endsWith('.annotations.push')) return true
+  return false
+}
+
+function allowedTestLiteral(node: ts.Node, sf: ts.SourceFile): boolean {
+  if (ts.isStringLiteral(node) && ts.isImportDeclaration(node.parent)) return true
+  if ((ts.isPropertyAssignment(node.parent) || ts.isMethodDeclaration(node.parent)) && node.parent.name === node) return true
+  if (insideAnnotationPush(node, sf)) return true
+  return (
+    directArgumentOf(node, 'test', 0, sf) ||
+    directArgumentOf(node, 'test.step', 0, sf) ||
+    directArgumentOf(node, 'testCase', 0, sf) ||
+    directArgumentOf(node, 'expect', 1, sf) ||
+    directArgumentOf(node, 'test.fail', 0, sf) ||
+    directArgumentOf(node, 'test.fail', 1, sf)
+  )
+}
+
 export function readSpecTests(source: string): SpecTest[] {
   const sf = parse(source)
   const tests: SpecTest[] = []
@@ -79,6 +109,22 @@ export function readSpecTests(source: string): SpecTest[] {
       tests.push(readTest(node, sf))
   })
   return tests
+}
+
+/** Inline payload and expected-value literals; reporting and annotation strings are excluded. */
+export function readInlineTestData(source: string): string[] {
+  const sf = parse(source)
+  const literals: string[] = []
+  descendants(sf, node => {
+    const literal =
+      ts.isStringLiteralLike(node) ||
+      ts.isNumericLiteral(node) ||
+      node.kind === ts.SyntaxKind.TrueKeyword ||
+      node.kind === ts.SyntaxKind.FalseKeyword ||
+      node.kind === ts.SyntaxKind.RegularExpressionLiteral
+    if (literal && !allowedTestLiteral(node, sf)) literals.push(node.getText(sf))
+  })
+  return literals
 }
 
 /** `test.skip`, `test.fixme`, `test.only`, `describe.skip` … — anything that stops a test from running in the suite. */

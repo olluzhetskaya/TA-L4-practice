@@ -4,6 +4,7 @@ import type { TestLevel } from '../input-validation/input-schemas.ts'
 import {
   coverageGate,
   manualStepNamesGate,
+  noHardcodedTestDataGate,
   stepNamesGate,
   traceGate,
 } from '../specs-validation/spec-gates.ts'
@@ -36,6 +37,7 @@ export function gradeSpecs(item: EvalItem, level: TestLevel, workspace: string, 
       ].map(g => ({ ...g, gate: `${file}: ${g.gate}` })),
     ),
     coverageGate(ctx.tests, testCases),
+    noHardcodedTestDataGate(ctx.specs),
     run('eslint', 'npx', ['--no-install', 'eslint', '--max-warnings=0', ...files], TIMEOUTS.style),
     run('ast-grep', 'npx', ['--no-install', 'ast-grep', 'scan', '--report-style=short', ...files], TIMEOUTS.style),
     run('tsc', 'npx', ['--no-install', 'tsc', '--noEmit'], TIMEOUTS.tscCheck),

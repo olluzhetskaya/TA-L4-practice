@@ -1,6 +1,6 @@
 import { fail, gateFromProblems, pass, type GateResult } from '../../lib/gates/gateResults.ts'
 import type { TestCaseFile } from '../input-validation/input-schemas.ts'
-import { levelFromSpecName, type SpecTest } from './spec-source.ts'
+import { levelFromSpecName, readInlineTestData, type SpecTest } from './spec-source.ts'
 
 const STEP_PREFIX = /^(Verify|Confirm) that /
 const MAX_PROBLEMS = 4
@@ -46,6 +46,14 @@ export function manualStepNamesGate(tests: SpecTest[], testCases: TestCaseFile):
       .map(title => `${test.tcId} step is not a manual action: ${JSON.stringify(title)}`)
   })
   return gateFromProblems('manual-step-names', problems.slice(0, MAX_PROBLEMS))
+}
+
+/** Payloads and expected values come from fixtures, responses, or schemas—not inline literals. */
+export function noHardcodedTestDataGate(specs: { file: string; source: string }[]): GateResult {
+  return gateFromProblems(
+    'no-hardcoded-test-data',
+    specs.flatMap(spec => readInlineTestData(spec.source).map(value => `${spec.file}: inline test data ${value}`)),
+  )
 }
 
 /** Every manual test case is automated by exactly one test across all spec files of the ticket. */

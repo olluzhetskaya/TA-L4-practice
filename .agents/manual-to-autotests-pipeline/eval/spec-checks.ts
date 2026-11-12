@@ -1,4 +1,3 @@
-import ts from 'typescript'
 import { gateFromProblems, type GateResult } from '../../lib/gates/gateResults.ts'
 import { readDisabledTestMarkers } from '../specs-validation/spec-source.ts'
 import type { SpecContext } from './spec-context.ts'
@@ -54,68 +53,9 @@ export const assertionParityCheck: SpecCheck = ({ tests, goldenTests }) =>
     }),
   )
 
-const parse = (source: string) => ts.createSourceFile('spec.ts', source, ts.ScriptTarget.Latest, true)
-
-function descendants(root: ts.Node, visit: (node: ts.Node) => void) {
-  const walk = (node: ts.Node) => {
-    visit(node)
-    ts.forEachChild(node, walk)
-  }
-  walk(root)
-}
-
-const callName = (call: ts.CallExpression, sf: ts.SourceFile) => call.expression.getText(sf)
-
-function directArgumentOf(node: ts.Node, callNameExpected: string, index: number, sf: ts.SourceFile): boolean {
-  return (
-    ts.isCallExpression(node.parent) &&
-    callName(node.parent, sf) === callNameExpected &&
-    node.parent.arguments[index]?.pos === node.pos
-  )
-}
-
-function insideAnnotationPush(node: ts.Node, sf: ts.SourceFile): boolean {
-  for (let current = node.parent; current; current = current.parent)
-    if (ts.isCallExpression(current) && callName(current, sf).endsWith('.annotations.push')) return true
-  return false
-}
-
-function allowedLiteral(node: ts.Node, sf: ts.SourceFile): boolean {
-  if (ts.isStringLiteral(node) && ts.isImportDeclaration(node.parent)) return true
-  if ((ts.isPropertyAssignment(node.parent) || ts.isMethodDeclaration(node.parent)) && node.parent.name === node) return true
-  if (insideAnnotationPush(node, sf)) return true
-  return (
-    directArgumentOf(node, 'test', 0, sf) ||
-    directArgumentOf(node, 'test.step', 0, sf) ||
-    directArgumentOf(node, 'testCase', 0, sf) ||
-    directArgumentOf(node, 'expect', 1, sf) ||
-    directArgumentOf(node, 'test.fail', 0, sf) ||
-    directArgumentOf(node, 'test.fail', 1, sf)
-  )
-}
-
-/** Payloads and expected values come from fixture-exported data, responses, or Zod schemas—not inline literals. */
-export const noHardcodedTestDataCheck: SpecCheck = ({ specs }) => {
-  const problems: string[] = []
-  for (const spec of specs) {
-    const sf = parse(spec.source)
-    descendants(sf, node => {
-      const literal =
-        ts.isStringLiteralLike(node) ||
-        ts.isNumericLiteral(node) ||
-        node.kind === ts.SyntaxKind.TrueKeyword ||
-        node.kind === ts.SyntaxKind.FalseKeyword ||
-        node.kind === ts.SyntaxKind.RegularExpressionLiteral
-      if (literal && !allowedLiteral(node, sf)) problems.push(`${spec.file}: inline test data ${node.getText(sf)}`)
-    })
-  }
-  return gateFromProblems('no-hardcoded-test-data', problems)
-}
-
 export const SPEC_CHECKS: readonly SpecCheck[] = [
   noDisabledTestsCheck,
   bugMarkingCheck,
-  noHardcodedTestDataCheck,
   statusParityCheck,
   assertionParityCheck,
 ]

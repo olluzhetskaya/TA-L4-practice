@@ -273,6 +273,7 @@ The TypeScript compiler API reads each spec, so an annotation belongs to its own
 Checks shared by the normal pipeline and eval:
 
 - **Spec gates:** exact manual title and `TC-n`; API/UI level matches the file; each `test.step` uses a manual action; every manual case has exactly one test.
+- **Test-data gate:** payload and expected-value literals must come from fixture-exported data, responses, or schemas. This strict source check can false-positive when a literal is genuinely part of the behaviour.
 - **TypeScript:** imports, fixture types, payloads, clients, and assertions compile.
 - **ESLint:** Playwright rules and TypeScript conventions pass.
 - **ast-grep:** specs import only `@fixtures`; raw `page`/`request` fixtures, locators, navigation, and request calls are rejected; every test has a non-empty step; assertions have messages; status codes, waits, URLs, and timeouts are not inline.
@@ -285,7 +286,6 @@ API contract checks:
 
 Eval-only checks:
 
-- **Controlled dataset:** no inline payload/expected literals. This is intentionally strict and may false-positive in a general suite.
 - **Golden parity:** expected statuses and assertion matcher strength. The normal pipeline has no golden answer.
 - **Anti-shortcut:** no disabled tests, inappropriate `test.fail`, or edits to protected inputs/config.
 - **LLM judge (advisory):** expected-result assertion quality. It can false-positive and never decides task pass/fail.
@@ -441,7 +441,6 @@ The eval first runs the shared spec checklist from Phase 3. It then adds:
 
 - `no-disabled-tests`: reject `skip`, `fixme`, and `only`;
 - `bug-marking`: require `test.fail` only for cases with an `annotate-gap` finding;
-- `no-hardcoded-test-data`: controlled-dataset check for inline payload/expected literals;
 - `parity:statuses`: require the statuses asserted by the golden;
 - `parity:assertions`: require at least the golden's assertion matcher strength;
 - `protected-files`: reject edits to task inputs, config, tools, and harness;

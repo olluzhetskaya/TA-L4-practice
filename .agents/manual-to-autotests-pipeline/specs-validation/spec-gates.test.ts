@@ -3,7 +3,7 @@ import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import { DIRS } from '../../harness-config.ts'
 import { testCaseFileSchema } from '../input-validation/input-schemas.ts'
-import { coverageGate, manualStepNamesGate, stepNamesGate, traceGate } from './spec-gates.ts'
+import { coverageGate, manualStepNamesGate, noHardcodedTestDataGate, stepNamesGate, traceGate } from './spec-gates.ts'
 import { levelFromSpecName, readDisabledTestMarkers, readSpecTests } from './spec-source.ts'
 
 const testCases = testCaseFileSchema.parse(JSON.parse(readFileSync(`${DIRS.testCases}/TOOL-1.json`, 'utf8')))
@@ -92,5 +92,14 @@ describe('spec coverage gate', () => {
 
   it('fails when a test case has two tests', () => {
     assert.match(coverageGate([...allSpecs, ...allSpecs.slice(0, 1)], testCases).detail ?? '', /more than one test/)
+  })
+})
+
+describe('test data gate', () => {
+  it('allows fixture-exported data and rejects inline payload or expected values', () => {
+    const clean = `test('title', async () => { expect(Data.actual, 'value').toBe(Data.expected) })`
+    const hardcoded = `test('title', async () => { send({ email: 'inline@example.com' }); expect(result, 'result').toBe(0) })`
+    assert.equal(noHardcodedTestDataGate([{ file: uiFile, source: clean }]).status, 'pass')
+    assert.equal(noHardcodedTestDataGate([{ file: uiFile, source: hardcoded }]).status, 'fail')
   })
 })
