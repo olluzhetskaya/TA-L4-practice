@@ -36,4 +36,4 @@ Apply to every file in the framework (`src/`, `tests/`) and to the harness (`.ag
 npm run validate:push   # typecheck + eslint + ast-grep + pipeline gates
 ```
 
-The Cursor `beforeShellExecution` hook and `.githooks/pre-push` run the same chain.
+`.githooks/pre-push` runs the same chain.

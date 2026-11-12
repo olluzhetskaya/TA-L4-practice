@@ -1,4 +1,4 @@
-/** Pipeline paths, npm script names, timeouts, and output-size constants for the harness. */
+/** Pipeline paths, timeouts, and output-size constants for the harness. */
 
 export const PIPELINE_DIR = '.agents/manual-to-autotests-pipeline'
 
@@ -8,9 +8,6 @@ export const DIRS = {
   artifacts: `${PIPELINE_DIR}/artifacts`,
   evalSkeleton: `${PIPELINE_DIR}/eval/skeleton`,
   evalDataset: `${PIPELINE_DIR}/eval/dataset`,
-  specsApi: 'tests/api',
-  specsUi: 'tests/ui',
-  src: 'src',
 } as const
 
 export const PATHS = {
@@ -18,13 +15,6 @@ export const PATHS = {
   testCasesSchema: `${PIPELINE_DIR}/input-validation/test-cases.schema.json`,
   storySchema: `${PIPELINE_DIR}/input-validation/story.schema.json`,
   explorationSchema: '.agents/skills/analyse-sut/references/exploration.schema.json',
-} as const
-
-export const NPM_SCRIPTS = {
-  typecheck: 'typecheck',
-  lint: 'lint',
-  astGrep: 'ast-grep',
-  runGates: 'runGates',
 } as const
 
 export const FILE_PATTERNS = {
@@ -54,8 +44,6 @@ export const VALIDATION = {
 export const TIMEOUTS = {
   /** Default for commandGate when callers omit timeoutMs. */
   defaultGate: 120_000,
-  /** npm run scripts: typecheck, lint, ast-grep, runGates (slow on large repos). */
-  npmScript: 600_000,
   /** npx tsc --noEmit inside an eval workspace. */
   tscCheck: 180_000,
   /** npx playwright test — CI, eval grading, and runTests. */
@@ -67,8 +55,6 @@ export const TIMEOUTS = {
 export const MAX_DETAIL_LINES = {
   /** Default for commandGate when callers omit maxDetailLines. */
   defaultGate: 12,
-  /** npm scripts in pre-push. */
-  npmScript: 20,
   /** Playwright run in CI mode. */
   playwright: 25,
 } as const

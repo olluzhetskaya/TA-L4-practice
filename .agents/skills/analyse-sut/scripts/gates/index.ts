@@ -3,10 +3,8 @@ import { locatorGate } from './locator-gate.ts'
 import { referencesGate } from './references-gate.ts'
 import { coverageGate } from './coverage-gate.ts'
 import { apiGate } from './api-gate.ts'
-import { hasFailure, type GateResult } from '../../../../lib/gates/gateResults.ts'
+import type { GateResult } from '../../../../lib/gates/gateResults.ts'
 import type { TestCaseFile } from '../../../../manual-to-autotests-pipeline/input-validation/input-schemas.ts'
-
-export { hasFailure }
 
 /**
  * Schema gate first — if it fails, the semantic gates get no typed value and are skipped.

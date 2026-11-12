@@ -159,8 +159,6 @@ export const storyJsonSchema = z.object({
     .min(1),
 })
 
-export type Step = z.infer<typeof stepSchema>
-export type StoryJson = z.infer<typeof storyJsonSchema>
 
 /** Story normalised to what the gates need, whichever format it came in. */
 export type StoryContext = { format: 'md' | 'json'; text: string; acIds: string[] }

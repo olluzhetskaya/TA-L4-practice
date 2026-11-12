@@ -2,16 +2,15 @@ import { readFileSync } from 'node:fs'
 import { isAbsolute, join } from 'node:path'
 import { commandGate } from '../../lib/gates/commandGate.ts'
 import { fail, fixRequired, toCheckResult, type CheckResult, type GateResult } from '../../lib/gates/gateResults.ts'
-import { passFailFromSchema } from '../../lib/gates/gateResults.ts'
-import { readOutputJson, relPosix } from '../../lib/files.ts'
-import { testCasePath, ticketFromFileName } from '../paths.ts'
-import { testCaseFileSchema } from '../input-validation/input-schemas.ts'
+import { relPosix } from '../../lib/files.ts'
+import { ticketFromFileName } from '../paths.ts'
+import { loadTestCases } from '../input-validation/load-test-cases.ts'
 import { FILE_PATTERNS } from '../../harness-config.ts'
 import { coverageWarnGate, stepNamesGate, traceGate } from './spec-gates.ts'
 import { readSpecFacts } from './spec-source.ts'
 
 /** eslint + ast-grep as gates — same entry the stop hook, `npm run runGates`, and CI use. */
-export function lintGates(file: string, root: string): GateResult[] {
+function lintGates(file: string, root: string): GateResult[] {
   return [
     commandGate('eslint', 'npx', ['--no-install', 'eslint', '--max-warnings=0', file], { cwd: root }),
     commandGate('ast-grep', 'ast-grep', ['scan', '--report-style=short', file], { cwd: root }),
@@ -30,10 +29,9 @@ export function reviewSpecFile(file: string, opts: { root?: string; lint?: boole
   if (!ticket)
     return fixRequired(file, ticket, fail('filename', 'spec file name must start with the ticket id, e.g. TOOL-1.contact.api.spec.ts'))
 
-  const tcRaw = readOutputJson(join(root, testCasePath(ticket)))
-  if (!tcRaw.ok) return fixRequired(file, ticket, fail('test-cases', `${testCasePath(ticket)}: ${tcRaw.detail}`))
-  const { result, value: testCases } = passFailFromSchema(testCaseFileSchema, tcRaw.raw)
-  if (!testCases) return fixRequired(file, ticket, { ...result, gate: 'test-cases' })
+  const loaded = loadTestCases(root, ticket)
+  if (!loaded.ok) return fixRequired(file, ticket, loaded.gate)
+  const { testCases } = loaded
 
   const facts = readSpecFacts(readFileSync(abs, 'utf8'))
   return toCheckResult(file, ticket, [

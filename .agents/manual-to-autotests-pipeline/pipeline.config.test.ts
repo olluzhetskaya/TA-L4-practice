@@ -19,9 +19,8 @@ describe('pipeline registry', () => {
     assert.equal(stageFor('README.md'), undefined)
   })
 
-  it('has unique stage ids and phases', () => {
+  it('has unique stage ids', () => {
     assert.equal(new Set(STAGES.map(s => s.id)).size, STAGES.length)
-    assert.equal(new Set(STAGES.map(s => s.phase)).size, STAGES.length)
   })
 
   it('returns undefined when no stage owns a file', () => {
@@ -39,7 +38,7 @@ describe('stop hook', () => {
   it('returns no followup when all stage files are clean', () => {
     const root = sandbox()
     try {
-      assert.deepEqual(runHook(root).output, {})
+      assert.deepEqual(runHook(root), {})
     } finally {
       rmSync(root, { recursive: true, force: true })
     }
@@ -49,10 +48,9 @@ describe('stop hook', () => {
     const root = sandbox()
     try {
       writeFileSync(join(root, '.agents/manual-to-autotests-pipeline/artifacts/explore-TOOL-1.json'), '{ not json')
-      const { output, results } = runHook(root)
-      assert.equal(results[0]?.decision, 'fix_required')
-      assert.match(output.followup_message ?? '', /explore-TOOL-1\.json/)
-      assert.match(output.followup_message ?? '', /Rules:/)
+      const { followup_message = '' } = runHook(root)
+      assert.match(followup_message, /explore-TOOL-1\.json/)
+      assert.match(followup_message, /Rules:/)
     } finally {
       rmSync(root, { recursive: true, force: true })
     }

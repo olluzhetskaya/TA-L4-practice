@@ -15,7 +15,7 @@ export const gateFromProblems = (gate: string, problems: string[]): GateResult =
 
 export const hasFailure = (results: GateResult[]) => results.some(r => r.status === 'fail')
 
-export type Decision = 'fix_required' | 'continue'
+type Decision = 'fix_required' | 'continue'
 export type CheckResult = {
   file: string
   ticket?: string

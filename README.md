@@ -79,7 +79,7 @@ The harness is split in two on purpose. `.agents/lib/` is **generic**: it knows 
 | Spec gates | traceability: title, annotation, level, step names, coverage | `.agents/manual-to-autotests-pipeline/specs-validation/` | 3 |
 | Command gate | wraps any CLI (eslint, ast-grep, tsc, Playwright) as a gate | `.agents/lib/gates/commandGate.ts` | 3 |
 | Lint rules | ESLint config + ast-grep rules with their tests | `eslint.config.mjs`, `tools/ast-grep/` | 4 |
-| Hooks | Cursor `stop` hook, git pre-commit and pre-push, the pre-push runner | `.cursor/hooks.json`, `.githooks/`, `.agents/scripts/pre-push-hook.ts` | 5 |
+| Hooks | Cursor `stop` hook, git pre-commit and pre-push | `.cursor/hooks.json`, `.githooks/` | 5 |
 | Specs | the generated API and UI specs for `TOOL-1` | `tests/api/`, `tests/ui/` | 6 |
 | CI | validate, then the api/ui matrix, with reports | `.github/workflows/tests.yml` | 7 |
 | Eval framework | generic runner, checks, scoring, judge, report | `.agents/lib/eval/` | 8 |
@@ -206,7 +206,7 @@ function run(files: string[]): number {
 process.exit(run(process.argv.slice(2)))
 ```
 
-Why the stage list is data and not an `if` chain: the hook, the CLI and CI all read it, so adding a stage in Phase 2 is one new entry. Grow the runner when a phase needs it: `--all` and `--stage` (each stage also says how to list its files), `--json` for machines, and the hook and CI modes (`--hook`, `--ci`, `--no-lint`, `--with-tests`) in Phases 5 and 7. The real runner also turns failures into a follow-up message for the agent, using each stage's own rules text.
+Why the stage list is data and not an `if` chain: the hook, the CLI and CI all read it, so adding a stage in Phase 2 is one new entry. Grow the runner when a phase needs it: `--all` (each stage also says how to list its files), `--no-lint`, and the `--hook` mode in Phase 5. The real runner also turns failures into a follow-up message for the agent, using each stage's own rules text.
 
 Make the schema reject bad data itself, so the gates have less to do. A few lines carry most of the idea:
 
@@ -346,10 +346,6 @@ Fix lint errors, never suppress them (`eslint-disable` is itself an error).
 **Why.** Gates that only run when someone remembers to run them protect nothing. Hooks make the checks part of the workflow: the agent is corrected the moment it finishes a turn, and a red push can't leave the machine.
 
 **Example.** The agent leaves a `page.waitForTimeout(2000)` in a spec and says "done". The stop hook runs, the `no-manual-sleep` rule fails, and the agent receives a follow-up message: *fix `tests/ui/TOOL-1.contact.ui.spec.ts`, use an auto-retrying assertion*. You did not type anything.
-
-This phase needs one more harness piece before the hooks can call them:
-
-- **A push check:** a script that runs the full validation and answers allow or block, with the reason. (`.agents/scripts/pre-push-hook.ts`)
 
 > **Think first.** Which check should run when? Slow checks on every keystroke get disabled; fast ones on every turn get ignored if they are noisy. Decide what runs after an agent turn, what on commit and what on push, and why. Our split: schema and semantic gates after a turn (seconds), static checks on commit, everything on push.
 
@@ -550,7 +546,7 @@ Reference items: `TOOL-1` (build everything from a skeleton), `TOOL-2` (API fiel
 | Command | Does |
 |---|---|
 | `npm run validate:push` | schema regen + typecheck + lint + ast-grep + all pipeline gates (what a push must pass) |
-| `npm run runGates -- <file…>` | review specific files; flags: `--all`, `--stage input\|analyse-sut\|specs`, `--ci`, `--json`, `--no-lint`, `--with-tests` |
+| `npm run runGates -- <file…>` | review specific files; flags: `--all` (every stage's files), `--no-lint` |
 | `npm run test` / `test:api` / `test:ui` | Playwright |
 | `npm run test:harness` | unit tests of gates, rules, hooks, eval framework |
 | `npm run generate:types` | refresh OpenAPI types in `src/types/generated/` |
@@ -567,7 +563,7 @@ wiki/TEST-STRATEGY.md                  what the agent must follow
   lib/                                 generic harness — no pipeline knowledge
     gates/                             pass/warn/fail gates, commandGate
     eval/                              eval framework: runner, checks, scoring, judge, report
-  scripts/                             runGates CLI, pre-push hook
+  scripts/                             runGates CLI
   skills/                              analyse-sut, create-api-spec, create-ui-spec + 12 supporting skills
   manual-to-autotests-pipeline/        the concrete pipeline
     pipeline.config.ts                 stage registry — single source of truth

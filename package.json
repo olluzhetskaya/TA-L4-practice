@@ -8,7 +8,7 @@
     "typecheck": "tsc --noEmit",
     "lint": "eslint .",
     "ast-grep": "bash tools/ast-grep/scan.sh",
-    "validate:push": "npm run schema && npm run typecheck && npm run lint && npm run ast-grep && npm run runGates -- --ci --no-lint",
+    "validate:push": "npm run schema && npm run typecheck && npm run lint && npm run ast-grep && npm run runGates -- --all --no-lint",
     "runGates": "tsx .agents/scripts/runGates-cli.ts",
     "schema": "tsx .agents/manual-to-autotests-pipeline/schema-exports.ts",
     "generate:types": "openapi-typescript \"${TOOLSHOP_API_URL:-https://api.practicesoftwaretesting.com}/docs\" -o src/types/generated/toolshop-api.d.ts",

@@ -12,7 +12,7 @@ npm run validate:push     # typecheck + lint + ast-grep + pipeline gates
 npm run test:api && npm run test:ui
 ```
 
-The `beforeShellExecution` hook runs `validate:push` for `git push` and `gh pr create` and blocks them with the failure text when it is red. Fix the code; never `--no-verify` or add `eslint-disable`.
+The git pre-push hook runs `validate:push` and blocks the push when it is red. Fix the code; never `--no-verify` or add `eslint-disable`.
 
 ## Raise the PR
 

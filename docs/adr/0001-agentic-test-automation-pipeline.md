@@ -49,7 +49,7 @@ Design rules that apply to every stage:
 Hooks and automation:
 
 - `.cursor/hooks.json` → `stop`: run the gates for files changed in the session; non-empty failures become a `followup_message` (bounded by `loop_limit`).
-- `.cursor/hooks.json` → `beforeShellExecution` matching `git push|gh pr create`: run `npm run validate:push`; deny with the failure text if it is red.
+- `.githooks/pre-push`: run `npm run validate:push`; a red chain blocks the push.
 - `.github/workflows/tests.yml`: on pull request, push to `main`, and a weekday schedule — validate, then api and ui projects in parallel with reports as artifacts.
 
 Evals (optional): a dataset of tickets with golden outputs (a finished Playwright spec per level and the golden artifact). A task stages a workspace, lets the agent run one skill, and grades the output with the same gates plus parity against the golden facts. Goldens are verified against the live system before they are used.

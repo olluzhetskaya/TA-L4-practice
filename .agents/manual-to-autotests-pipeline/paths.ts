@@ -13,9 +13,3 @@ export function ticketFromFileName(file: string): string | undefined {
   const base = file.split(/[\\/]/).pop() ?? file
   return FILE_PATTERNS.ticketAtStart.exec(base)?.[1]
 }
-
-export const DATASET_FILES = {
-  testCases: 'test-cases.json',
-  story: 'story.md',
-  reference: 'reference',
-} as const

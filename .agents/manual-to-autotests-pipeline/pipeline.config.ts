@@ -1,9 +1,6 @@
 /**
  * Single source of truth for the pipeline. The stop hook, `npm run runGates`, CI,
  * the evals, and the README task sheet all read the stages from here.
- *
- *   input ─▶ analyse-sut ─▶ specs ─▶ (run tests) ─▶ PR ─▶ CI
- *   hook 1     hook 2        hook 3
  */
 import type { CheckResult } from '../lib/gates/gateResults.ts'
 import { DIRS, FILE_PATTERNS, PIPELINE_DIR } from '../harness-config.ts'
@@ -17,11 +14,9 @@ export type ReviewOpts = { root: string; lint?: boolean }
 
 export type Stage = {
   id: 'input' | 'analyse-sut' | 'specs'
-  phase: number
-  title: string
   /** Repo-relative posix path predicate: which files this stage's hook owns. */
   owns: RegExp
-  /** Where to look when reviewing every file (`--all` / `--ci`). */
+  /** Where to look when reviewing every file (`--all`). */
   list: (root: string) => string[]
   review: (file: string, opts: ReviewOpts) => CheckResult
   /** Appended to the follow-up message the agent receives when a gate fails. */
@@ -33,8 +28,6 @@ const { generated: GENERATED } = FILE_PATTERNS
 export const STAGES: Stage[] = [
   {
     id: 'input',
-    phase: 1,
-    title: 'Input validation (test cases + optional story)',
     owns: new RegExp(`^${PIPELINE_DIR}/test-cases/[^/]+\\.json$`),
     list: root => listFiles(root, DIRS.testCases, /\.json$/),
     review: (file, { root }) => reviewInputFile(file, { root }),
@@ -46,8 +39,6 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'analyse-sut',
-    phase: 2,
-    title: 'SUT analysis artifact (locators + network + scenarios)',
     owns: new RegExp(`^${PIPELINE_DIR}/artifacts/explore-[^/]+\\.json$`),
     list: root => listFiles(root, DIRS.artifacts, /explore-[^/]+\.json$/),
     review: (file, { root }) => reviewExplorationFile(file, { root }),
@@ -60,8 +51,6 @@ export const STAGES: Stage[] = [
   },
   {
     id: 'specs',
-    phase: 3,
-    title: 'Playwright specs, POMs, fixtures, API clients (lint + ast-grep + traceability)',
     owns: /^(src|tests)\/.+\.ts$/,
     list: root =>
       [...listFiles(root, 'tests', /\.ts$/), ...listFiles(root, 'src', /\.ts$/)].filter(
