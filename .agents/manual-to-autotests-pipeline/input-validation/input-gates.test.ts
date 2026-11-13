@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, it } from 'node:test'
 import { DIRS } from '../../harness-config.ts'
-import { hasFailure } from '../../lib/gates/gateResults.ts'
+import { hasFailure } from '../../lib/gateResults.ts'
 import { reviewInput } from './input-gates.ts'
 
 let root = ''

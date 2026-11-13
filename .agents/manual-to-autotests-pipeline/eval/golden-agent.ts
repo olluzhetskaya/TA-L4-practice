@@ -1,4 +1,4 @@
-import type { AgentRunner } from './cursor-runner.ts'
+import type { AgentRunner } from '../../lib/eval/cursor-runner.ts'
 import type { SpecTask } from './spec-task.ts'
 import { overlayGolden } from './workspace.ts'
 

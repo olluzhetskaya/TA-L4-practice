@@ -15,7 +15,7 @@ import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DIRS } from '../harness-config.ts'
 import { listFiles, readOutputJson } from '../lib/files.ts'
-import { fail, hasFailure, type GateResult } from '../lib/gates/gateResults.ts'
+import { fail, hasFailure, type GateResult } from '../lib/gateResults.ts'
 import { explorationGates, missingExplorationGate } from './exploration-validation/gates.ts'
 import { reviewInput } from './input-validation/input-gates.ts'
 import type { TestCaseFile } from './input-validation/input-schemas.ts'
@@ -24,6 +24,7 @@ import {
   coverageGate,
   manualStepNamesGate,
   noHardcodedTestDataGate,
+  rawFixtureGate,
   stepNamesGate,
   traceGate,
 } from './specs-validation/spec-gates.ts'
@@ -60,6 +61,7 @@ const specGates = (root: string, files: string[], testCases: TestCaseFile, compl
         traceGate(file, tests, testCases),
         stepNamesGate(tests),
         manualStepNamesGate(tests, testCases),
+        rawFixtureGate(tests),
       ].map(g => ({ ...g, gate: `${file}: ${g.gate}` })),
     ),
     noHardcodedTestDataGate(perFile),

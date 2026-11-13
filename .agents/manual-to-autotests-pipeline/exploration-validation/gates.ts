@@ -1,4 +1,4 @@
-import { fail, gateFromProblems, passFailFromSchema, type GateResult } from '../../lib/gates/gateResults.ts'
+import { fail, gateFromProblems, passFailFromSchema, type GateResult } from '../../lib/gateResults.ts'
 import type { TestCaseFile } from '../input-validation/input-schemas.ts'
 import { explorationSchema, type Exploration } from './schema.ts'
 

@@ -12,6 +12,8 @@ export type SpecTest = {
   statuses: string[]
   /** Playwright/Jest matcher names called on `expect(...)`, preserving duplicates. */
   matchers: string[]
+  /** Built-in Playwright fixtures destructured by this test callback. */
+  rawFixtures: string[]
   /** The body calls `test.fail(...)`. */
   expectedFailure: boolean
 }
@@ -45,6 +47,7 @@ function readTest(call: ts.CallExpression, sf: ts.SourceFile): SpecTest {
     stepTitles: [],
     statuses: [],
     matchers: [],
+    rawFixtures: [],
     expectedFailure: false,
   }
   const options = call.arguments[1]
@@ -54,6 +57,14 @@ function readTest(call: ts.CallExpression, sf: ts.SourceFile): SpecTest {
       descendants(annotation, node => {
         if (ts.isCallExpression(node) && node.expression.getText(sf) === 'testCase') test.tcId ??= literalText(node.arguments[0])
       })
+  }
+  const callback = [...call.arguments].reverse().find(arg => ts.isArrowFunction(arg) || ts.isFunctionExpression(arg))
+  const fixtureParameter = callback?.parameters[0]?.name
+  if (fixtureParameter && ts.isObjectBindingPattern(fixtureParameter)) {
+    test.rawFixtures = fixtureParameter.elements.flatMap(element => {
+      const sourceName = element.propertyName?.getText(sf) ?? element.name.getText(sf)
+      return sourceName === 'page' || sourceName === 'request' ? [sourceName] : []
+    })
   }
   descendants(call, node => {
     if (ts.isCallExpression(node)) {
@@ -87,10 +98,31 @@ function insideAnnotationPush(node: ts.Node, sf: ts.SourceFile): boolean {
   return false
 }
 
+function coveredBySpecificRule(node: ts.Node, sf: ts.SourceFile): boolean {
+  if (ts.isPropertyAssignment(node.parent) && node.parent.initializer === node && node.parent.name.getText(sf) === 'timeout')
+    return true
+  if (!ts.isCallExpression(node.parent) || !node.parent.arguments.some(argument => argument === node)) return false
+  const name = callName(node.parent, sf)
+  const pageMethod = name.startsWith('page.') && (name === 'page.goto' || name === 'page.locator' || name.startsWith('page.getBy'))
+  const statusAssertion = name.startsWith('expect(') && name.includes('.status()') && (name.endsWith('.toBe') || name.endsWith('.toEqual'))
+  const okAssertion =
+    name.startsWith('expect(') &&
+    name.includes('.ok()') &&
+    (name.endsWith('.toBe') || name.endsWith('.toBeTruthy') || name.endsWith('.toBeFalsy'))
+  return (
+    name === 'setTimeout' ||
+    name.endsWith('.nth') ||
+    pageMethod ||
+    statusAssertion ||
+    okAssertion
+  )
+}
+
 function allowedTestLiteral(node: ts.Node, sf: ts.SourceFile): boolean {
   if (ts.isStringLiteral(node) && ts.isImportDeclaration(node.parent)) return true
   if ((ts.isPropertyAssignment(node.parent) || ts.isMethodDeclaration(node.parent)) && node.parent.name === node) return true
   if (insideAnnotationPush(node, sf)) return true
+  if (coveredBySpecificRule(node, sf)) return true
   return (
     directArgumentOf(node, 'test', 0, sf) ||
     directArgumentOf(node, 'test.step', 0, sf) ||

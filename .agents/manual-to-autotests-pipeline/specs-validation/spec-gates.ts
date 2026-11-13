@@ -1,11 +1,9 @@
-import { fail, gateFromProblems, pass, type GateResult } from '../../lib/gates/gateResults.ts'
+import { gateFromProblems, type GateResult } from '../../lib/gateResults.ts'
 import type { TestCaseFile } from '../input-validation/input-schemas.ts'
 import { levelFromSpecName, readInlineTestData, type SpecTest } from './spec-source.ts'
 
 const STEP_PREFIX = /^(Verify|Confirm) that /
 const MAX_PROBLEMS = 4
-
-const quoteAll = (items: string[]) => items.map(item => JSON.stringify(item)).join(', ')
 
 /** Test titles are the manual TC titles; each carries a `testCase('TC-n')` annotation for the same TC, at the file's level. */
 export function traceGate(file: string, tests: SpecTest[], testCases: TestCaseFile): GateResult {
@@ -26,10 +24,12 @@ export function traceGate(file: string, tests: SpecTest[], testCases: TestCaseFi
 }
 
 export function stepNamesGate(tests: SpecTest[]): GateResult {
-  const bad = tests.flatMap(test => test.stepTitles).filter(title => !STEP_PREFIX.test(title))
-  return bad.length
-    ? fail('step-names', `step names must start with "Verify that" or "Confirm that": ${quoteAll(bad.slice(0, 3))}`)
-    : pass('step-names')
+  const missing = tests.filter(test => test.stepTitles.length === 0).map(test => `${JSON.stringify(test.title)} has no test.step`)
+  const bad = tests
+    .flatMap(test => test.stepTitles)
+    .filter(title => !STEP_PREFIX.test(title))
+    .map(title => `step must start with "Verify that" or "Confirm that": ${JSON.stringify(title)}`)
+  return gateFromProblems('step-names', [...missing, ...bad].slice(0, MAX_PROBLEMS))
 }
 
 const normaliseStep = (text: string) => text.trim().replace(/[.!]$/, '').toLocaleLowerCase()
@@ -53,6 +53,14 @@ export function noHardcodedTestDataGate(specs: { file: string; source: string }[
   return gateFromProblems(
     'no-hardcoded-test-data',
     specs.flatMap(spec => readInlineTestData(spec.source).map(value => `${spec.file}: inline test data ${value}`)),
+  )
+}
+
+/** Specs receive framework abstractions rather than Playwright's built-in page or request fixtures. */
+export function rawFixtureGate(tests: SpecTest[]): GateResult {
+  return gateFromProblems(
+    'fixture-injection',
+    tests.flatMap(test => test.rawFixtures.map(fixture => `${JSON.stringify(test.title)} injects raw ${fixture}`)),
   )
 }
 

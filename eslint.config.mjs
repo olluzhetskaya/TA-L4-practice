@@ -90,6 +90,22 @@ export default [
     },
   },
   {
+    files: ['tests/**/*.spec.ts'],
+    rules: {
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              regex: '^(?!@fixtures$).*',
+              message: 'Specs import only from @fixtures; expose dependencies through the fixture barrel.',
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
     files: ['tests/fixtures/**/*.ts'],
     rules: { 'no-empty-pattern': 'off' },
   },

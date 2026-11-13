@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
-import { fail, pass, passFailFromSchema, warn, type GateResult } from '../../lib/gates/gateResults.ts'
+import { fail, pass, passFailFromSchema, warn, type GateResult } from '../../lib/gateResults.ts'
 import { readOutputJson } from '../../lib/files.ts'
 import { STRATEGY_FILE, testCasePath } from '../paths.ts'
 import { testCaseFileSchema, type StoryContext, type TestCaseFile } from './input-schemas.ts'

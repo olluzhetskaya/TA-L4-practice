@@ -3,7 +3,14 @@ import { readFileSync } from 'node:fs'
 import { describe, it } from 'node:test'
 import { DIRS } from '../../harness-config.ts'
 import { testCaseFileSchema } from '../input-validation/input-schemas.ts'
-import { coverageGate, manualStepNamesGate, noHardcodedTestDataGate, stepNamesGate, traceGate } from './spec-gates.ts'
+import {
+  coverageGate,
+  manualStepNamesGate,
+  noHardcodedTestDataGate,
+  rawFixtureGate,
+  stepNamesGate,
+  traceGate,
+} from './spec-gates.ts'
 import { levelFromSpecName, readDisabledTestMarkers, readSpecTests } from './spec-source.ts'
 
 const testCases = testCaseFileSchema.parse(JSON.parse(readFileSync(`${DIRS.testCases}/TOOL-1.json`, 'utf8')))
@@ -72,9 +79,19 @@ describe('spec traceability gates', () => {
     assert.equal(stepNamesGate(read(goodSource.replace('Confirm that send the form', 'Click send and see'))).status, 'fail')
   })
 
+  it('fails a test with no test.step', () => {
+    assert.equal(stepNamesGate(read(`test('flat', async ({ contactPage }) => { await contactPage.open() })`)).status, 'fail')
+  })
+
   it('fails a Playwright step that paraphrases the manual action', () => {
     const source = goodSource.replace('Confirm that send the form', 'Confirm that the form submits successfully')
     assert.equal(manualStepNamesGate(read(source), testCases).status, 'fail')
+  })
+
+  it('rejects raw Playwright fixtures including aliases', () => {
+    const source = `test('raw', async ({ contactPage, page: browserPage }, testInfo) => { await browserPage.title(); testInfo.snapshotSuffix = '' })`
+    assert.equal(rawFixtureGate(read(source)).status, 'fail')
+    assert.equal(rawFixtureGate(read(`test('clean', async ({ contactPage }) => { await contactPage.open() })`)).status, 'pass')
   })
 
 })
@@ -101,5 +118,15 @@ describe('test data gate', () => {
     const hardcoded = `test('title', async () => { send({ email: 'inline@example.com' }); expect(result, 'result').toBe(0) })`
     assert.equal(noHardcodedTestDataGate([{ file: uiFile, source: clean }]).status, 'pass')
     assert.equal(noHardcodedTestDataGate([{ file: uiFile, source: hardcoded }]).status, 'fail')
+  })
+
+  it('leaves literals covered by focused static rules to those rules', () => {
+    const source = `test('title', async ({ page }) => {
+      await page.goto('/contact')
+      await page.locator('#send').click()
+      await new Promise(resolve => setTimeout(resolve, 1000))
+      expect(response.status(), 'status').toBe(200)
+    })`
+    assert.equal(noHardcodedTestDataGate([{ file: uiFile, source }]).status, 'pass')
   })
 })

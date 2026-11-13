@@ -1,16 +1,17 @@
 import { TIMEOUTS } from '../../harness-config.ts'
-import { fail, type GateResult } from '../../lib/gates/gateResults.ts'
+import { commandGate } from '../../lib/eval/command-gate.ts'
+import { fail, type GateResult } from '../../lib/gateResults.ts'
 import type { TestLevel } from '../input-validation/input-schemas.ts'
 import {
   coverageGate,
   manualStepNamesGate,
   noHardcodedTestDataGate,
+  rawFixtureGate,
   stepNamesGate,
   traceGate,
 } from '../specs-validation/spec-gates.ts'
 import type { EvalItem } from './dataset.ts'
 import { protectedFilesGate } from './protected-files.ts'
-import { commandGate } from './run-command.ts'
 import { runSpecGates } from './run-specs.ts'
 import { buildSpecContext } from './spec-context.ts'
 import { SPEC_CHECKS } from './spec-checks.ts'
@@ -34,6 +35,7 @@ export function gradeSpecs(item: EvalItem, level: TestLevel, workspace: string, 
         traceGate(file, tests, testCases),
         stepNamesGate(tests),
         manualStepNamesGate(tests, testCases),
+        rawFixtureGate(tests),
       ].map(g => ({ ...g, gate: `${file}: ${g.gate}` })),
     ),
     coverageGate(ctx.tests, testCases),

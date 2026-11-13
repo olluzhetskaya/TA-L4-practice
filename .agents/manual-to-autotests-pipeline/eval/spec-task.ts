@@ -1,8 +1,7 @@
-import { rmSync } from 'node:fs'
-import { hasFailure, type GateResult } from '../../lib/gates/gateResults.ts'
+import type { AgentRunner } from '../../lib/eval/cursor-runner.ts'
+import { runEvalTask, type EvalOutcome } from '../../lib/eval/run-task.ts'
 import type { TestLevel } from '../input-validation/input-schemas.ts'
 import { artifactPath, storyMdPath, testCasePath } from '../paths.ts'
-import type { AgentRunner } from './cursor-runner.ts'
 import type { EvalItem } from './dataset.ts'
 import { gradeSpecs, type SpecGradeOptions } from './grade.ts'
 import { judgeSpecs } from './judge.ts'
@@ -11,7 +10,7 @@ import { buildWorkspace } from './workspace.ts'
 export type SpecTask = { level: TestLevel; item: EvalItem }
 
 /** `judgement` is advisory and never part of `passed`. */
-export type TaskOutcome = { task: SpecTask; workspace: string; gates: GateResult[]; judgement: GateResult[]; passed: boolean }
+export type TaskOutcome = EvalOutcome<SpecTask>
 
 /** One spec task per test-case level the item has. */
 export function tasksFor(items: EvalItem[], level?: TestLevel): SpecTask[] {
@@ -34,13 +33,14 @@ export type RunSpecTaskOptions = SpecGradeOptions & {
 
 /** Stage a clean workspace, let the agent work in it, grade what it wrote, clean up. */
 export async function runSpecTask(task: SpecTask, opts: RunSpecTaskOptions): Promise<TaskOutcome> {
-  const workspace = buildWorkspace(opts.repoRoot, task.item)
-  try {
-    await opts.agent(promptFor(task), { workspace })
-    const gates = gradeSpecs(task.item, task.level, workspace, opts)
-    const judgement = opts.judge ? await judgeSpecs(task, workspace, opts.judge.agent, opts.judge.model) : []
-    return { task, workspace, gates, judgement, passed: !hasFailure(gates) }
-  } finally {
-    if (!opts.keepWorkspace) rmSync(workspace, { recursive: true, force: true })
-  }
+  return runEvalTask(task, {
+    agent: opts.agent,
+    keepWorkspace: opts.keepWorkspace,
+    buildWorkspace: current => buildWorkspace(opts.repoRoot, current.item),
+    promptFor,
+    grade: (current, workspace) => gradeSpecs(current.item, current.level, workspace, opts),
+    judge: opts.judge
+      ? (current, workspace) => judgeSpecs(current, workspace, opts.judge?.agent ?? opts.agent, opts.judge?.model)
+      : undefined,
+  })
 }

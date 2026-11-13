@@ -16,7 +16,7 @@ The whole design is one bet: an agent is excellent at *producing* text and poor 
 - **Deterministic gates.** Every check is code that returns `pass` / `warn` / `fail` the same way every run — reproducible, reviewable, and identical whether you or the agent runs it. "Looks right" is never the bar; a named gate with a message is.
 - **A defined output format between phases.** Analysis doesn't hand the spec phase prose — it writes a Zod-schema'd JSON artifact. A machine-checkable contract means the next phase can rely on it, and a mistake is caught at the boundary instead of surfacing three phases later as a mystery.
 - **Fail loud and early.** Inputs, artifacts, and specs are each validated at their own boundary. A vague `expected`, an invented status, or a dangling AC reference is rejected where it's introduced, so bad data can't silently propagate.
-- **Native tools first, custom code only for domain knowledge.** TypeScript, ESLint, ast-grep and Playwright run directly through npm scripts. The custom domain gates only check relationships those tools cannot know: input validity, live evidence per manual case, traceability, manual-step names, and exactly-once coverage. `validate.ts` is their single CLI/hook entry point, not another validation framework.
+- **Native tools first, custom code only for domain knowledge.** TypeScript, ESLint, ast-grep and Playwright run directly through npm scripts. The custom domain gates only check relationships those tools cannot know: input validity, live evidence per manual case, traceability, manual-step names, fixture injection, test-data ownership, and exactly-once coverage. `validate.ts` is their single CLI/hook entry point, not another validation framework.
 - **Hooks close the loop automatically.** The stop hook feeds failures back to the agent as a to-do; the pre-push hook runs the same `npm run validate` as CI and blocks a red push. The agent self-corrects without a human in the loop to remember to check — the guardrails run whether or not anyone is watching.
 - **Grounded in the live system, traceable to a test case.** Assertions trace to behaviour actually observed on the SUT (not assumptions), and every spec maps back to a manual test case — nothing is tested that nobody asked for, and nothing asked for is left untested.
 
@@ -77,7 +77,7 @@ Custom code is kept to what native tools cannot know. Everything else is an npm 
 | Part | What it is | Where | Phase |
 |---|---|---|---|
 | Design record | the decision, the rejected options, the stage table | `docs/adr/` | 0 |
-| Gate result | `pass` / `warn` / `fail` and the Zod helper | `.agents/lib/gates/gateResults.ts` | 1 |
+| Gate result | `pass` / `warn` / `fail` and the Zod helper | `.agents/lib/gateResults.ts` | 1 |
 | Harness config | paths, timeouts, file patterns, eval protected files | `.agents/harness-config.ts` | 1 |
 | Pipeline validator | per ticket: inputs, exploration artifact, specs. One entry for the stop hook, the CLI and CI (`npm run validate:pipeline`) | `.agents/manual-to-autotests-pipeline/validate.ts` | 1 |
 | Input gates | test case and story schemas + gates | `.agents/manual-to-autotests-pipeline/input-validation/` | 1 |
@@ -85,12 +85,12 @@ Custom code is kept to what native tools cannot know. Everything else is an npm 
 | Analyse skill | the recipe the agent follows | `.agents/skills/analyse-sut/` | 2 |
 | Exploration gates | the artifact schema and five exploration gates | `.agents/manual-to-autotests-pipeline/exploration-validation/` | 2 |
 | Spec skills | `create-api-spec`, `create-ui-spec` | `.agents/skills/create-*-spec/` | 3 |
-| Spec gates | title/ID/level traceability, manual-action step names, and one test per test case | `.agents/manual-to-autotests-pipeline/specs-validation/` | 3 |
-| Static rules | TypeScript + ESLint + ast-grep, including fixture/import boundaries and Playwright code shapes | `tsconfig.json`, `eslint.config.mjs`, `tools/ast-grep/` | 4 |
+| Spec gates | title/ID/level traceability, required manual-action steps, fixture injection, test-data ownership, and one test per test case | `.agents/manual-to-autotests-pipeline/specs-validation/` | 3 |
+| Static rules | TypeScript + ESLint + ast-grep, including the spec import boundary and Playwright code shapes | `tsconfig.json`, `eslint.config.mjs`, `tools/ast-grep/` | 4 |
 | Hooks | Cursor `stop` hook, git pre-push | `.cursor/hooks.json`, `.githooks/` | 5 |
 | Specs | the generated API and UI specs for `TOOL-1` | `tests/api/`, `tests/ui/` | 6 |
 | CI | `npm run validate`, then the api/ui matrix, with reports | `.github/workflows/tests.yml` | 7 |
-| Advanced eval (optional) | dataset with goldens, workspace builder, deterministic graders, opt-in LLM judge, one CLI | `.agents/manual-to-autotests-pipeline/eval/`, `scripts/run-eval.ts` | 8 |
+| Advanced eval (optional) | reusable eval engine plus a spec dataset, workspace builder, deterministic graders, opt-in LLM judge, and one CLI | `.agents/lib/eval/`, `.agents/manual-to-autotests-pipeline/eval/`, `scripts/run-eval.ts` | 8 |
 | Harness tests | `node:test` for core gates and rules (`npm run test:harness`); eval tests are separate (`npm run test:eval`) | `*.test.ts` under `.agents/` | all |
 
 The full folder map is under [Layout](#layout).
@@ -182,7 +182,7 @@ This is also where the harness is born. You can't check anything without a way t
 
 **Build** three things, in this order. Files in this repo are in brackets.
 
-1. **One validator.** A command that takes a ticket, runs its checks, prints each result and exits non-zero if one failed. It is the one entry point the hook, CI and you will all call. (`.agents/manual-to-autotests-pipeline/validate.ts`, with the result type in `.agents/lib/gates/gateResults.ts`)
+1. **One validator.** A command that takes a ticket, runs its checks, prints each result and exits non-zero if one failed. It is the one entry point the hook, CI and you will all call. (`.agents/manual-to-autotests-pipeline/validate.ts`, with the result type in `.agents/lib/gateResults.ts`)
 2. **Concrete input validation checks.** The schema for the test case file and the gates from the table above, as a function that takes a ticket and returns its results. (`.agents/manual-to-autotests-pipeline/input-validation/`)
 3. **One place for shared facts:** directories, file patterns and timeouts, so no check hard-codes a path. (`.agents/harness-config.ts`)
 
@@ -272,11 +272,11 @@ The TypeScript compiler API reads each spec, so an annotation belongs to its own
 
 Checks shared by the normal pipeline and eval:
 
-- **Spec gates:** exact manual title and `TC-n`; API/UI level matches the file; each `test.step` uses a manual action; every manual case has exactly one test.
-- **Test-data gate:** payload and expected-value literals must come from fixture-exported data, responses, or schemas. This strict source check can false-positive when a literal is genuinely part of the behaviour.
+- **Spec gates:** exact manual title and `TC-n`; API/UI level matches the file; every test uses a manual-action `test.step`; raw `page`/`request` fixtures are rejected; every manual case has exactly one test.
+- **Test-data gate:** payload and expected-value literals must come from fixture-exported data, responses, or schemas. Focused static rules own status, wait, timeout, locator, and navigation literals so the general gate does not report them twice. The remaining strict check can still false-positive when a literal is genuinely part of the behaviour.
 - **TypeScript:** imports, fixture types, payloads, clients, and assertions compile.
-- **ESLint:** Playwright rules and TypeScript conventions pass.
-- **ast-grep:** specs import only `@fixtures`; raw `page`/`request` fixtures, locators, navigation, and request calls are rejected; every test has a non-empty step; assertions have messages; status codes, waits, URLs, and timeouts are not inline.
+- **ESLint:** specs import only `@fixtures`; Playwright rules and TypeScript conventions pass.
+- **ast-grep:** locators, navigation, and request calls are rejected in specs; steps cannot be empty; assertions have messages; status codes, waits, URLs, and timeouts are not inline.
 - **Playwright:** generated specs execute against the configured SUT.
 
 API contract checks:
@@ -348,12 +348,12 @@ Pairs to learn from:
 | `no-manual-sleep` — no fixed waits | `await page.waitForTimeout(2000)` | `await expect(alert).toBeVisible()` |
 | `no-nth-zero`, `no-then-in-async-code`, `no-inline-magic-timeout` — stability | `locator.nth(0)`, `.then(…)`, `{ timeout: 5000 }` | a precise locator, `await`, a named constant |
 | `no-request-context-outside-api-helper` — layering | `request.post(...)` in a spec | `toolshopApi.contact.send(...)` |
-| `spec-imports-fixture-barrel`, `no-raw-playwright-fixture-in-spec` — dependency injection | direct `@data/*` import or `async ({ page })` | import from `@fixtures`; inject `contactPage` / `toolshopApi` |
-| `prefer-test-step` / `no-empty-test-step` — readable reports | a `test()` body with no `test.step` | `await test.step('Verify that …', …)` |
+| ESLint + spec gates — dependency injection | direct `@data/*` import or `async ({ page })` | import from `@fixtures`; inject `contactPage` / `toolshopApi` |
+| spec gates + `no-empty-test-step` — readable reports | no `test.step`, or an empty one | `await test.step('Verify that …', …)` |
 
 Fix lint errors, never suppress them (`eslint-disable` is itself an error).
 
-*Acceptance:* `npm run ast-grep` and `npm run lint` pass on clean code and fail on each bad fixture (`specs-validation/ast-grep-rules.test.ts` runs them).
+*Acceptance:* `npm run ast-grep` and `npm run lint` pass on clean code. The ast-grep rule tests exercise rejected and accepted code shapes; ESLint owns the `@fixtures`-only spec import boundary.
 
 ## Phase 5 — Wire the hooks
 
@@ -422,12 +422,13 @@ Gates tell you whether *one* output is acceptable. They don't tell you whether t
 
 | Part | What it is here | Where |
 |---|---|---|
-| **Dataset** | tickets with fixed inputs and a stored *golden* answer | `eval/dataset/` |
-| **Runner** | stage a clean workspace → run the agent with a natural prompt → grade → clean up | `eval/spec-task.ts`, `eval/cursor-runner.ts` |
-| **Grader** | gates that return `pass` / `warn` / `fail`; a task passes when none fails | `eval/grade.ts`, `eval/spec-checks.ts` |
-| **Judge** (opt-in) | an LLM scores each test case against a rubric; advisory | `eval/judge.ts` |
+| **Runner library** | run an agent task, execute command gates, build/parse judge verdicts, and parse annotated Playwright reports | `.agents/lib/eval/` |
+| **Dataset** | this pipeline's tickets with fixed inputs and a stored *golden* answer | `.agents/manual-to-autotests-pipeline/eval/dataset/` |
+| **Spec task** | stage this pipeline's workspace, build its prompt, grade it, and clean up | `.agents/manual-to-autotests-pipeline/eval/spec-task.ts`, `workspace.ts` |
+| **Grader** | apply shared spec gates and this pipeline's golden/protected-file checks | `.agents/manual-to-autotests-pipeline/eval/grade.ts`, `spec-checks.ts` |
+| **Judge** (opt-in) | reusable prompt/parsing plus this pipeline's test-case rubric; advisory | `.agents/lib/eval/judge.ts`, `.agents/manual-to-autotests-pipeline/eval/judge.ts` |
 
-All implementation lives under `.agents/manual-to-autotests-pipeline/eval/`. The example deliberately evaluates only spec creation: each task receives fixed test cases, story, and exploration evidence, then asks the agent naturally to write the spec in a disposable workspace. This isolates the skill being measured and prevents live-system drift from changing the input.
+Reusable eval mechanics live under `.agents/lib/eval/`; they know nothing about tickets, manual-test schemas, or this pipeline's annotation name. The concrete dataset, workspace, spec task, graders, rubric, and `'test-case'` annotation convention live under `.agents/manual-to-autotests-pipeline/eval/`. The example deliberately evaluates only spec creation: each task receives fixed test cases, story, and exploration evidence, then asks the agent naturally to write the spec in a disposable workspace. This isolates the skill being measured and prevents live-system drift from changing the input.
 
 The teaching pattern is:
 
@@ -453,7 +454,7 @@ Golden comparisons ignore helper names and file layout, so a different valid imp
 
 Some questions have no deterministic answer: *does this assertion really verify the expected result?* A test can have the right title, the right annotation, a `200` check and a green run, and still not look at the response body the test case cares about.
 
-That is the one job of the optional LLM judge (`eval/judge.ts`). It builds one criterion per test case from the manual steps:
+That is the one job of the optional LLM judge. The reusable library builds and parses the judge exchange; the concrete `.agents/manual-to-autotests-pipeline/eval/judge.ts` builds one criterion per test case from the manual steps:
 
 ```
 judge:TC-2  The test verifies each expected result with an assertion that would fail
@@ -467,7 +468,7 @@ The judge returns `{ id, pass, reason }` verdicts reported as `judge:TC-n`. They
 
 ### Run the example
 
-Each dataset item contains fixed test cases, story, exploration artifact, and golden output. `spec-task.ts` creates the workspace and runs the agent; `grade.ts` applies deterministic checks; `judge.ts` optionally adds advisory verdicts. `scripts/run-eval.ts` exposes two modes:
+Each dataset item contains fixed test cases, story, exploration artifact, and golden output. The reusable `runEvalTask` owns the task lifecycle; concrete `spec-task.ts` supplies the workspace, prompt, grader, and optional judge callbacks. `scripts/run-eval.ts` exposes two modes:
 
 | Command | Does |
 |---|---|
@@ -520,7 +521,7 @@ A task passes only when its deterministic gates pass. Judge failures are printed
 | `npm run schema:update` / `schema:check` | rewrite / verify the exported `*.schema.json` files |
 | `npm run test` / `test:api` / `test:ui` | Playwright |
 | `npm run test:harness` | core unit tests of gates, rules, and the validator |
-| `npm run test:eval` | optional eval calibration and runner tests |
+| `npm run test:eval` | reusable eval-library tests plus concrete spec-eval calibration and runner tests |
 | `npm run generate:types` | refresh OpenAPI types in `src/types/generated/` |
 | `npm run eval [-- --golden TICKET --level=api --no-run --keep --judge --verbose]` | advanced: grade golden outputs, or run a live agent on each spec task and grade it (`--judge` adds the advisory LLM judge; `--verbose` prints every gate) |
 
@@ -531,7 +532,8 @@ docs/adr/                              decisions (0001 = this pipeline)
 wiki/TEST-STRATEGY.md                  what the agent must follow
 .agents/
   harness-config.ts                    paths, timeouts, patterns
-  lib/                                 gate result type, file helpers
+  lib/                                 shared gate/file helpers
+    eval/                              reusable eval runner, judge, command and report modules
   skills/                              automate-test-case entry, three stage skills + 12 supporting skills
   manual-to-autotests-pipeline/        the concrete pipeline
     validate.ts                        the one custom check: inputs -> artifact -> specs

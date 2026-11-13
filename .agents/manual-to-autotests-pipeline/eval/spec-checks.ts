@@ -1,4 +1,4 @@
-import { gateFromProblems, type GateResult } from '../../lib/gates/gateResults.ts'
+import { gateFromProblems, type GateResult } from '../../lib/gateResults.ts'
 import { readDisabledTestMarkers } from '../specs-validation/spec-source.ts'
 import type { SpecContext } from './spec-context.ts'
 

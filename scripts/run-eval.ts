@@ -9,8 +9,8 @@
  *                 With --golden it calibrates the judge: the goldens must get full marks.
  */
 import { parseArgs } from 'node:util'
-import { hasFailure } from '../.agents/lib/gates/gateResults.ts'
-import { createCursorRunner } from '../.agents/manual-to-autotests-pipeline/eval/cursor-runner.ts'
+import { createCursorRunner } from '../.agents/lib/eval/cursor-runner.ts'
+import { hasFailure } from '../.agents/lib/gateResults.ts'
 import { loadEvalItems } from '../.agents/manual-to-autotests-pipeline/eval/dataset.ts'
 import { goldenAgent } from '../.agents/manual-to-autotests-pipeline/eval/golden-agent.ts'
 import { runSpecTask, tasksFor, type TaskOutcome } from '../.agents/manual-to-autotests-pipeline/eval/spec-task.ts'

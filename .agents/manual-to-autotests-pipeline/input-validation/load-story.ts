@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { storyJsonPath, storyMdPath } from '../paths.ts'
 import { storyJsonSchema, type StoryContext } from './input-schemas.ts'
-import { formatZod } from '../../lib/gates/gateResults.ts'
+import { formatZod } from '../../lib/gateResults.ts'
 
 export type StoryLoad =
   | { status: 'missing' }

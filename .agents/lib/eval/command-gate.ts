@@ -1,18 +1,17 @@
 import { spawnSync } from 'node:child_process'
 import { delimiter, join } from 'node:path'
-import { fail, pass, type GateResult } from '../../lib/gates/gateResults.ts'
+import { fail, pass, type GateResult } from '../gateResults.ts'
 
 const MAX_BUFFER = 16 * 1024 * 1024
 
-type CommandOptions = {
+export type CommandOptions = {
   cwd: string
   timeoutMs: number
   env?: NodeJS.ProcessEnv
-  /** Output lines kept in the failure detail. */
   maxLines?: number
 }
 
-/** Run a CLI inside an eval workspace: exit 0 is a pass, anything else a fail carrying the head of the output. */
+/** Run a CLI inside an eval workspace and convert its exit status into a gate result. */
 export function commandGate(gate: string, command: string, args: string[], opts: CommandOptions): GateResult {
   const env = opts.env ?? { ...process.env, PATH: `${join(opts.cwd, 'node_modules/.bin')}${delimiter}${process.env.PATH ?? ''}` }
   const run = spawnSync(command, args, { cwd: opts.cwd, env, encoding: 'utf8', timeout: opts.timeoutMs, maxBuffer: MAX_BUFFER })
