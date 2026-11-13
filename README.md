@@ -475,43 +475,141 @@ gh pr create --fill
 
 ## Phase 8 (advanced) — Evals
 
-Skip this on a first pass: the core pipeline is complete after Phase 7. Evals are a separate, advanced exercise, and they only grade the spec-writing skills. It teaches both kinds of grader: deterministic checks first, then an LLM judge for what is left. The judge is built and unit-tested but costs tokens, so it only runs when you pass `--judge`.
+Skip this on a first pass: the core pipeline is complete after Phase 7. Evals are a separate, advanced exercise, and they only grade the spec-writing skills. They teach both kinds of grader: deterministic checks first, then an LLM judge for what is left. The judge is built and unit-tested but costs tokens, so it only runs when you pass `--judge`.
 
 ### Why
 
 Gates tell you whether *one* output is acceptable. They don't tell you whether the **skill** is good: change a sentence in `create-api-spec/SKILL.md` and you can't know if the agent now writes better specs, worse ones, or the same. An eval is a repeatable experiment: the same input every time, an agent run unattended, and a result computed by code. It turns "I think the skill got better" into "4/4 tasks passed before, 3/4 now".
 
-### The shape of an eval
+### Vocabulary
+
+| Term | Meaning |
+|---|---|
+| **Dataset item** | One ticket with fixed inputs (test cases, story, exploration artifact) and a *golden* output — one acceptable answer, not the only one. |
+| **Task** | A `(dataset item × test level)` pair — one unit the agent is asked to deliver in one run. |
+| **Workspace** | Disposable copy of the repo where the agent writes; deleted after grading unless `--keep`. |
+| **Gate** | Deterministic check with `pass` / `warn` / `fail`. Any `fail` fails the task. |
+| **Judge** | Optional LLM check reported as `judge:TC-n`. Advisory — never decides task pass/fail. |
+
+### Where it lives
 
 | Part | What it is here | Where |
 |---|---|---|
-| **Runner library** | run an agent task, execute command gates, build/parse judge verdicts, and parse annotated Playwright reports | `.agents/lib/eval/` |
+| **Runner library** | run an agent task, execute command gates, build/parse judge verdicts, parse annotated Playwright reports | `.agents/lib/eval/` |
 | **Dataset** | this pipeline's tickets with fixed inputs and a stored *golden* answer | `.agents/manual-to-autotests-pipeline/eval/dataset/` |
-| **Spec task** | stage this pipeline's workspace, build its prompt, grade it, and clean up | `.agents/manual-to-autotests-pipeline/eval/spec-task.ts`, `workspace.ts` |
+| **Spec task** | stage this pipeline's workspace, build its prompt, grade it, clean up | `.agents/manual-to-autotests-pipeline/eval/spec-task.ts`, `workspace.ts` |
 | **Grader** | apply shared spec gates and this pipeline's golden/protected-file checks | `.agents/manual-to-autotests-pipeline/eval/grade.ts`, `spec-checks.ts` |
 | **Judge** (opt-in) | reusable prompt/parsing plus this pipeline's test-case rubric; advisory | `.agents/lib/eval/judge.ts`, `.agents/manual-to-autotests-pipeline/eval/judge.ts` |
 
-Reusable eval mechanics live under `.agents/lib/eval/`; they know nothing about tickets, manual-test schemas, or this pipeline's annotation name. The concrete dataset, workspace, spec task, graders, rubric, and `'test-case'` annotation convention live under `.agents/manual-to-autotests-pipeline/eval/`. The example deliberately evaluates only spec creation: each task receives fixed test cases, story, and exploration evidence, then asks the agent naturally to write the spec in a disposable workspace. This isolates the skill being measured and prevents live-system drift from changing the input.
+Reusable mechanics under `.agents/lib/eval/` know nothing about tickets, manual-test schemas, or this pipeline's annotation name. Everything concrete (dataset, workspace, graders, rubric, `'test-case'` annotation) lives under `.agents/manual-to-autotests-pipeline/eval/`. The example deliberately evaluates only spec creation: each task receives fixed inputs and asks the agent naturally to write the spec in a disposable workspace. This isolates the skill being measured and prevents live-system drift from changing the input.
 
-The teaching pattern is:
+Principle: run cheap, reproducible checks first and let them decide pass/fail. Ask an LLM judge only the quality question code cannot answer reliably, and keep it advisory because its answer is not deterministic.
 
-1. Run cheap, reproducible checks first. These decide whether the task passed.
-2. Ask an LLM judge only the quality question code cannot answer reliably.
-3. Keep the judge advisory because its answer is not deterministic.
+### Create a dataset item
 
-### What to check
+A dataset item is a directory under `.agents/manual-to-autotests-pipeline/eval/dataset/<TICKET>/`:
 
-The eval first runs the shared spec checklist from Phase 3. It then adds:
+```
+TOOL-2/
+  test-cases.json                              # Xray export (Phase 1 shape)
+  story.md                                     # # <title> + ## Acceptance Criteria with **AC-n** bullets
+  explore.json                                 # golden analyse-sut artifact (Phase 2 shape)
+  golden/                                      # one acceptable output the agent should match
+    tests/api/TOOL-2.contact-limits.api.spec.ts
+    src/data/contact.ts                        # any support code the spec needs
+```
 
-- `no-disabled-tests`: reject `skip`, `fixme`, and `only`;
-- `bug-marking`: require `test.fail` only for cases with an `annotate-gap` finding;
-- `parity:statuses`: require the statuses asserted by the golden;
-- `parity:assertions`: require at least the golden's assertion matcher strength;
-- `protected-files`: reject edits to task inputs, config, tools, and harness;
-- `run:TC-n` (unless `--no-run`): execute each generated case;
-- `judge:TC-n` with `--judge`: advisory expected-result assertion review.
+Checklist to add `TOOL-N`:
 
-Golden comparisons ignore helper names and file layout, so a different valid implementation can pass.
+1. **Mirror the layout** of an existing ticket — `TOOL-2` for API, `TOOL-3` for UI. Keep the ticket id consistent in every file and in every spec file name (`TOOL-N.<slug>.<level>.spec.ts`).
+2. **`test-cases.json`** — reuse the Xray schema. Every case links back to `TOOL-N`, each `AC-n` label must exist in `story.md`, every step needs a concrete `expected result`. The Phase 1 gates run on this file too.
+3. **`story.md`** — `# TOOL-N: <title>` followed by `## Acceptance Criteria` and one `**AC-n**` bullet per criterion.
+4. **`explore.json`** — observe the live SUT first. Each API call needs at least one `observed { case, status, body }`. Any product bug goes in `findings` with `resolution: "annotate-gap"`; the eval expects `test.fail` on those cases.
+5. **`golden/`** — hand-write the output the agent should produce. Specs under `tests/<level>/TOOL-N.*.<level>.spec.ts`; any helpers, data builders, or fixtures the spec imports sit beside them under `src/` or `tests/fixtures/`.
+6. **Calibrate** — `npm run eval -- --golden TOOL-N --no-run --verbose`. Every deterministic gate must pass. If a gate fails, fix the golden, not the gate.
+
+The reference ticket `TOOL-1` lives in the main repo (see `skeleton.ts`): its feature code is removed before the agent runs so it writes the framework *and* the spec from scratch (`base: 'skeleton'`). Dataset items under `eval/dataset/` are `base: 'full'` — the agent extends the finished framework and only writes the spec.
+
+### What a task is
+
+`tasksFor(items)` produces one task per `(ticket × level)`:
+
+```
+TOOL-1 × api     # skeleton base — agent writes framework + spec
+TOOL-1 × ui
+TOOL-2 × api     # full base — agent writes spec only
+TOOL-3 × ui
+```
+
+Each task runs through `runSpecTask`:
+
+1. **Stage** — copy the repo to a temp workspace; symlink `node_modules`; exclude eval data, `.env`, auth. Skeleton tasks also drop the reference feature code.
+2. **Prompt** — the agent receives a plain, no-skill-named request with the three input paths so it has to pick the right skill itself:
+   > Automate the api test cases for TOOL-2. Test cases: … Story: … SUT analysis: … Do not ask questions; finish autonomously.
+3. **Grade** — run every gate against the workspace; collect the results.
+4. **Judge (opt-in)** — ask a different LLM only the "do the assertions verify the expected results?" question.
+5. **Clean** — delete the workspace unless `--keep`.
+
+Two task flavours are useful:
+
+- **Skeleton task** (`TOOL-1`) measures *end-to-end* skill: can the agent infer page objects, API clients, fixtures, and specs from the inputs alone?
+- **Full task** (`TOOL-2`, `TOOL-3`, …) isolates the *spec skill*: can it extend an already-correct framework without touching anything else?
+
+### Scoring by example
+
+One task, `TOOL-2 × api`. The agent writes `tests/api/TOOL-2.limits.api.spec.ts`. Each row is one gate produced by `gradeSpecs`:
+
+| Gate | Answers | Fail message |
+|---|---|---|
+| `TOOL-2.spec.ts: trace` | every `test(…)` has a `testCase('TC-n')` matching its title | `"Sends over-limit" is not a TC title in TOOL-2` |
+| `TOOL-2.spec.ts: step-names` | step names start `Verify that` / `Confirm that` | `step 1: missing manual-action prefix` |
+| `TOOL-2.spec.ts: manual-step-names` | step names echo the manual action wording | `step 2 does not match any TC-1 action` |
+| `TOOL-2.spec.ts: raw-fixture` | no `async ({ page, request })` in spec args | `TC-1 injects page directly` |
+| `coverage` | every manual case covered **exactly once** | `TC-3 is not covered` / `TC-1 has 2 tests` |
+| `no-hardcoded-data` | payload literals come from fixtures/responses | `TC-1 inlines "jane@example.com"` |
+| `eslint` | project ESLint passes with `--max-warnings=0` | `no-unused-vars at line 12` |
+| `ast-grep` | no `page.goto`, no status literal, no manual sleep … | `no-status-literal-in-assert at line 42` |
+| `tsc` | the workspace still typechecks | `TS2322: … not assignable to …` |
+| `no-disabled-tests` | no `skip` / `fixme` / `only` | `TC-2 is .skip` |
+| `bug-marking` | `test.fail` set iff the case has an `annotate-gap` finding | `TC-2 hits a product bug — must call test.fail('BUG: …')` |
+| `parity:statuses` | asserts every HTTP status the golden asserts | `TC-1 never asserts HttpStatus.UNPROCESSABLE_ENTITY` |
+| `parity:assertions` | asserts at least as strongly as the golden | `TC-3 lacks matcher: toMatchObject` |
+| `protected-files` | configs, tools, harness, other tickets' specs, task inputs unchanged | `playwright.config.ts was modified` |
+| `run:TC-n` (unless `--no-run`) | Playwright executes that test case green | `TC-1: expected 422, got 200` |
+| `judge:TC-n` (with `--judge`) | *advisory* — assertions actually verify each expected result | `TC-2 verifies status but not the field-level error` |
+
+A task passes iff every non-advisory gate passes. Judge results are listed next to the others but never flip `passed`. Golden comparisons look at asserted statuses and matcher strength, not helper names or file layout, so a different valid implementation can pass.
+
+### Metrics the run exposes
+
+```
+FAIL TOOL-2 api
+       ✗ TOOL-2.spec.ts: trace: "Sends message" is not a TC title in TOOL-2
+       ✗ parity:statuses: TC-1 never asserts HttpStatus.UNPROCESSABLE_ENTITY
+       ✗ run:TC-1: expected 422, got 200
+
+tasks passed: 2/4
+judge criteria passed (advisory): 5/9
+```
+
+Two numbers are printed; a labelled failure list says *why*. Read them as orthogonal quality signals — a healthy skill scores well on all of them, and a regression usually moves only one or two:
+
+| Quality signal | Reads from | Drops when the agent … |
+|---|---|---|
+| **Task pass rate** `tasks passed: X/N` | all deterministic gates for every task | writes anything a gate rejects |
+| **Convention match** | `eslint`, `ast-grep`, `tsc`, `step-names`, `raw-fixture` | drifts from `AGENTS.md`, rules, or TypeScript types |
+| **Traceability** | `trace`, `coverage`, `manual-step-names` | invents titles, doubles up, or skips a manual case |
+| **No shortcuts** | `no-disabled-tests`, `bug-marking`, `no-hardcoded-data` | skips a failing test, forgets `test.fail`, inlines a payload |
+| **Golden parity** | `parity:statuses`, `parity:assertions` | asserts weaker than the reference (a different valid implementation is fine) |
+| **Green execution** | share of `run:TC-n` passing | writes a spec that compiles but never actually verifies the behaviour |
+| **Isolation / no backdoor fix** | `protected-files` | edits configs, tools, or other tickets' specs to force green |
+| **Judge agreement** (advisory) | share of `judge:TC-n` passing | asserts *something*, but not the thing the test case cares about |
+
+The runner prints one snapshot per invocation. To watch for regression after a skill edit:
+
+- Run the same `tasks` before and after and diff the labelled failures.
+- Repeat the live run — agents are non-deterministic. A single flip is noise; a trend is a regression.
+- Capture the output yourself (`npm run eval … | tee runs/$(date +%F).txt`); the harness does not keep history.
 
 ### What needs a judge
 
@@ -527,11 +625,9 @@ judge:TC-2  The test verifies each expected result with an assertion that would 
 
 A status-only test should fail this criterion because it never verifies the field-level error. The judge sees the manual cases, generated spec, and golden spec as one valid reference. Its prompt explicitly excludes style, naming, annotations, compilation, and execution because deterministic tools already cover them.
 
-The judge returns `{ id, pass, reason }` verdicts reported as `judge:TC-n`. They never change the task's pass/fail result. Calibrate the judge against the golden outputs before reading its feedback. Rule of thumb: if a check can be code, make it code; use the judge only for the remainder.
+The judge returns `{ id, pass, reason }` verdicts reported as `judge:TC-n`. Calibrate it against the golden outputs before reading its feedback. Rule of thumb: if a check can be code, make it code; use the judge only for the remainder.
 
 ### Run the example
-
-Each dataset item contains fixed test cases, story, exploration artifact, and golden output. The reusable `runEvalTask` owns the task lifecycle; concrete `spec-task.ts` supplies the workspace, prompt, grader, and optional judge callbacks. `scripts/run-eval.ts` exposes two modes:
 
 | Command | Does |
 |---|---|
@@ -541,20 +637,6 @@ Each dataset item contains fixed test cases, story, exploration artifact, and go
 | `npm run eval -- --golden --no-run --judge --verbose` | print every advisory judge criterion too; requires `CURSOR_API_KEY` and optionally `CURSOR_JUDGE_MODEL` |
 
 Run `npm run test:eval` first, then calibrate with `--golden`. If a golden fails, fix the grader or fixture before evaluating an agent. Omit `--no-run` when the eval should also execute Playwright.
-
-### Reading the result
-
-```
-ok   TOOL-1 api
-FAIL TOOL-2 api
-       protected-files: playwright.config.ts was modified
-       run:TC-2: Expected 422 …
-
-tasks passed: 3/4
-judge criteria passed (advisory): 7/9   <- only with --judge
-```
-
-A task passes only when its deterministic gates pass. Judge failures are printed separately and never change `tasks passed`. Read the named failures rather than treating one small-sample percentage as a benchmark; repeat live runs before deciding that a skill improved.
 
 *Acceptance:* `npm run test:eval` passes, `npm run eval -- --golden --no-run` accepts every golden, and `npm run eval -- --golden --no-run --judge` gives the goldens full advisory marks.
 
