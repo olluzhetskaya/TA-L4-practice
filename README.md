@@ -278,6 +278,8 @@ The goal is correct code on the first run, not code that becomes correct only af
 - **File scoped — `.cursor/rules/*.mdc`:** detailed contracts activated by matching files. Rules deliberately overlap: while editing a spec, the data and fixture rules also load; UI specs additionally load the POM rule, and API specs load the API-client rule.
 - **On demand — `.agents/skills/*/SKILL.md`:** procedural workflows such as analysing the SUT, creating an API/UI spec, choosing locators, building a page object, or managing test state.
 
+Other coding agents provide analogous instruction layers: Claude Code uses `CLAUDE.md` and `.claude/rules/`; GitHub Copilot uses `.github/copilot-instructions.md` and path-scoped `.github/instructions/*.instructions.md`. Adapt the same contracts to the supported format of the agent used by the project.
+
 The automation engineer must define these conventions for the real project before asking the agent to generate tests. Adapt the supplied examples to the project's architecture, naming, data ownership, fixture model, and quality bar; do not copy rules or skills that describe a different framework. Keep them current when the framework changes.
 
 Keep each fact at the narrowest useful level: universal policy in `AGENTS.md`, layer contracts in project rules, and multi-step instructions in skills. ESLint, ast-grep, TypeScript, pipeline gates, and Playwright are the second phase—a deterministic safety net and feedback loop, not the primary source of coding instructions.
