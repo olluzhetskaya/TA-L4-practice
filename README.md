@@ -1,99 +1,179 @@
 # TA L4 Practice — Build an Agentic Test-Automation Pipeline
 
-You build, from scratch, a harness that turns **manual test cases** into **green Playwright API + UI specs**. The Playwright framework supplies typed clients, page objects, data, and fixtures; Cursor skills sequence the work; deterministic gates validate each output.
+You build, from scratch, an agentic pipeline that turns **manual test cases** into **automated API and UI tests** — from requirements to green, traceable specs. The example uses a TypeScript + Playwright framework, but the approach applies to any language and test tool: the agent contract, JSON boundaries, deterministic gates, and hook mechanics are framework-agnostic.
 
 ```
-manual test cases (+ story) ─▶ input gates ─▶ live SUT exploration ─▶ evidence gates
-        ─▶ API/UI spec generation ─▶ traceability + tsc + lint + ast-grep ─▶ Playwright ─▶ PR/CI
+manual test cases (+ story)
+  ─▶ [input validation]  schema + domain checks on requirements
+  ─▶ [SUT exploration]   live browser/API session → structured JSON artifact
+  ─▶ [evidence gates]    schema + coverage checks on the artifact
+  ─▶ [spec generation]   agent writes API + UI tests
+  ─▶ [static analysis]   types + lint + code-shape + convention gates
+  ─▶ [test execution]    run the generated specs against the SUT
+  ─▶ PR / CI
 ```
 
 System under test: **Toolshop** — UI <https://practicesoftwaretesting.com>, API <https://api.practicesoftwaretesting.com>, API docs <https://api.practicesoftwaretesting.com/api/documentation> (OpenAPI at `/docs`). Public demo customer: `customer@practicesoftwaretesting.com` / `welcome01`.
 
-## Architecture design approach
+## The core pattern
 
-The whole design is one bet: an agent is excellent at *producing* text and poor at *judging* its own output — so the agent writes, and deterministic code judges. Each idea below exists to keep that split honest.
+An agent produces two kinds of output: **structured data** (JSON artifacts) and **source code** (specs, page objects, helpers). The validation approach follows the output type.
 
-- **Deterministic gates.** Every check is code that returns `pass` / `warn` / `fail` the same way every run — reproducible, reviewable, and identical whether you or the agent runs it. "Looks right" is never the bar; a named gate with a message is.
-- **A defined output format between phases.** Analysis doesn't hand the spec phase prose — it writes a Zod-schema'd JSON artifact. A machine-checkable contract means the next phase can rely on it, and a mistake is caught at the boundary instead of surfacing three phases later as a mystery.
-- **Fail loud and early.** Inputs, artifacts, and specs are each validated at their own boundary. A vague `expected`, an invented status, or a dangling AC reference is rejected where it's introduced, so bad data can't silently propagate.
-- **Native tools first, custom code only for domain knowledge.** TypeScript, ESLint, ast-grep and Playwright run directly through npm scripts. The custom domain gates only check relationships those tools cannot know: input validity, live evidence per manual case, traceability, manual-step names, fixture injection, test-data ownership, and exactly-once coverage. `validate.ts` is their single CLI/hook entry point, not another validation framework.
-- **Hooks close the loop automatically.** The stop hook feeds failures back to the agent as a to-do; the pre-push hook runs the same `npm run validate` as CI and blocks a red push. The agent self-corrects without a human in the loop to remember to check — the guardrails run whether or not anyone is watching.
-- **Grounded in the live system, traceable to a test case.** Assertions trace to behaviour actually observed on the SUT (not assumptions), and every spec maps back to a manual test case — nothing is tested that nobody asked for, and nothing asked for is left untested.
+### Why JSON between phases
+
+An agent asked to "explore the login page" will write prose or can skip an action entirely, hallucinating locators it never observed. That is unverifiable: the next phase can't assert it covers every acceptance criterion, can't check that every locator was actually observed, and can't tell whether a field was omitted or just not mentioned. When the output is a JSON object with a schema, the boundary becomes a contract: required fields are present or the gate fails; extra prose lives in a typed string field, not scattered through free text. Downstream phases receive data they can rely on, and mistakes surface at the phase boundary instead of as a mystery three phases later.
+
+### Why hooks
+
+A hook is a callback registered for a lifecycle event — the tool (agent runtime, git, CI) calls it automatically at a fixed point in the workflow, with no action required from the person or agent running the task. The key property is *unconditional execution*: neither the agent nor the developer has to remember to run a check — the hook fires regardless.
+
+Two hook types are used here:
+
+- **Agent stop hook** (`.cursor/hooks.json`, `stop` event): fires after every agent turn, before the next message is read. The hook receives the agent's output and its return value is injected as a follow-up message the agent sees immediately.
+- **Git pre-push hook** (`.githooks/pre-push`): fires before `git push` transfers anything. A non-zero exit blocks the push.
+
+An agent can produce valid TypeScript that breaks a convention. The agent won't notice unless it's told. A stop hook runs the domain validator after every turn and injects any failures as a follow-up message; the agent sees its own mistakes immediately and corrects them before moving on. Without the hook, every violation is a manual review item.
+
+Hooks are also how the guardrails apply to the agent's natural workflow rather than requiring a separate check the agent might skip: the same validator runs whether the agent calls it explicitly or not.
+
+**Structured data** is validated with a schema and optional domain checks:
+
+| Layer | What it checks | TypeScript stack | Python stack | Java stack |
+|---|---|---|---|---|
+| Schema | shape, types, required fields | Zod `safeParse` | Pydantic `model_validate` | Jackson + Bean Validation (`@NotNull`, `@Pattern`) |
+| Domain checks | business rules the schema cannot express | custom gate functions | custom validator functions | custom rule functions |
+
+**Source code** is validated with static analysis and convention checks:
+
+| Layer | What it checks | TypeScript stack | Python stack | Java stack |
+|---|---|---|---|---|
+| Types | correct types, no unsafe casts | `tsc --noEmit` | `mypy` | `javac` + `maven-compiler-plugin` |
+| Style/imports | conventions, unused code, banned patterns | ESLint + plugins | Ruff / Flake8 | Checkstyle + PMD |
+| Code shapes | structural patterns a linter can't match | ast-grep | ast-grep or Semgrep | Semgrep or PMD XPath rules |
+| Domain checks | traceability, naming, fixture wiring | custom gate functions | custom gate functions | custom gate functions |
+
+The custom domain gates are the small, project-specific layer. Everything else uses existing tools.
+
+**Adopting this pattern** means: pick a schema library for your language, wire the standard static-analysis tools already used by your stack, and write only the checks that know your domain. The pipeline structure — inputs → structured artifact → generated code → validation at each boundary — works in any language.
+
+## Agentic tool concepts
+
+An agent-driven pipeline uses three kinds of guidance. They differ in scope and portability:
+
+| Guidance type | Scope | Portable? | Cursor | Claude Code | GitHub Copilot |
+|---|---|---|---|---|---|
+| **Always-on conventions** | whole repository | ✅ tool-agnostic | `AGENTS.md` | `CLAUDE.md` | `.github/copilot-instructions.md` |
+| **File-scoped rules** | activates for matching files | ❌ tool-specific wiring | `.cursor/rules/*.mdc` | `.claude/rules/` | `.github/instructions/*.instructions.md` |
+| **On-demand skills** | loaded only for a named task | ✅ tool-agnostic ([Agent Skills](https://agentskills.io/home) format) | `.cursor/skills` → `.agents/skills` | `.claude/commands/` | Copilot Extensions |
+
+Skills are the most portable layer: written once in the [Agent Skills](https://agentskills.io/home) format, they can be reused across any compatible agent. Rules and hooks are tool-specific wiring around the same contracts — the concept (activate on file match; run gates after every turn; bounce failures back) is portable, but the config file and event names are not. `AGENTS.md`-style always-on conventions are readable by any agent that follows the [AGENTS.md](https://agentprotocol.ai) convention.
+
+The automation engineer defines these layers for the real project before asking the agent to generate code. Adapt the supplied examples to the project's architecture, naming, data ownership, and quality bar; do not copy rules or skills that describe a different framework. Keep them current when the framework changes.
 
 ## Tools and instruments
 
-`npm install` installs the project dependencies. Cursor, `playwright-cli`, and `gh` are separate tools.
+Tools are grouped by what they do in the pipeline, not by what they are. `npm install` installs the project dependencies; Cursor, `playwright-cli`, and `gh` are installed separately.
 
-| Tool | Role in the pipeline |
+**JSON validation** — schema and domain checks on structured pipeline data
+
+| Tool | This example | Alternative |
+|---|---|---|
+| Schema validation | [Zod](https://zod.dev) `safeParse` | Pydantic, Jackson + Bean Validation |
+| API type generation | [openapi-typescript](https://openapi-ts.dev) (`npm run generate:types`) | openapi-generator, datamodel-code-generator |
+| Custom domain gates | TypeScript gate functions in `.agents/` | any language |
+
+**Static code analysis** — checks on generated test code
+
+| Tool | This example | Alternative |
+|---|---|---|
+| Type checker | [TypeScript](https://www.typescriptlang.org) `tsc --noEmit` | mypy, javac |
+| Style / import rules | [ESLint](https://eslint.org) + [`typescript-eslint`](https://typescript-eslint.io) + [`eslint-plugin-playwright`](https://github.com/playwright-community/eslint-plugin-playwright) + [`eslint-plugin-sonarjs`](https://github.com/SonarSource/SonarJS/blob/master/packages/analysis/src/jsts/rules/README.md) | Ruff, Checkstyle + PMD |
+| Code-shape rules | [ast-grep](https://ast-grep.github.io) | Semgrep, PMD XPath |
+| Convention gates | TypeScript gate functions in `.agents/` | any language |
+
+**Test automation framework (TAF)** — the layer the agent generates tests for
+
+| Tool | This example | Alternative |
+|---|---|---|
+| Test runner + assertions | [Playwright](https://playwright.dev) `@playwright/test` | pytest, JUnit, Vitest |
+| Live SUT exploration | [playwright-cli](https://github.com/microsoft/playwright-cli) | manual, Selenium IDE |
+| Harness unit tests | [node:test](https://nodejs.org/api/test.html) | pytest, JUnit |
+
+**Agent tooling** — guidance, automation, and feedback loop
+
+| Tool | This example | Alternative |
+|---|---|---|
+| Agent + hooks | [Cursor](https://cursor.com) + [hooks](https://cursor.com/docs/hooks) (`stop` event, `.cursor/hooks.json`) | Claude Code (`.claude/settings.json`), custom agent loop |
+| Always-on conventions | `AGENTS.md` | `CLAUDE.md`, `.github/copilot-instructions.md` |
+| File-scoped rules | `.cursor/rules/*.mdc` | `.claude/rules/`, `.github/instructions/` |
+| On-demand skills | [Agent Skills](https://agentskills.io/home) (`.agents/skills/`) | Claude commands, Copilot Extensions |
+| Unattended evals | [`@cursor/sdk`](https://www.npmjs.com/package/@cursor/sdk) (`CURSOR_API_KEY`) | Cursor SDK, custom runner |
+
+**Version control and CI**
+
+| Tool | Role |
 |---|---|
-| **[Node.js](https://nodejs.org) ≥ 22** + **[npm](https://docs.npmjs.com)** | runtime and script runner (every `npm run …` below) |
-| **[TypeScript](https://www.typescriptlang.org)** (`tsc`) + **[tsx](https://tsx.is)** | framework and harness code are typed TS; `tsx` runs harness commands directly, with no build step |
-| **[Zod](https://zod.dev)** ([repo](https://github.com/colinhacks/zod)) | validates pipeline inputs/artifacts and parses untrusted API/auth responses at runtime |
-| **[Playwright](https://playwright.dev)** (`@playwright/test`, [repo](https://github.com/microsoft/playwright)) | the API + UI specs and their fixtures; `playwright test` runs them |
-| **[playwright-cli](https://github.com/microsoft/playwright-cli)** | drive a live browser session to explore the SUT in Phase 2 |
-| **[ESLint](https://eslint.org)** (+ [`typescript-eslint`](https://typescript-eslint.io), [`eslint-plugin-playwright`](https://github.com/playwright-community/eslint-plugin-playwright), [`eslint-plugin-sonarjs`](https://github.com/SonarSource/SonarJS/blob/master/packages/analysis/src/jsts/rules/README.md)) | enforce the coding conventions; run as a gate |
-| **[ast-grep](https://ast-grep.github.io)** (`@ast-grep/cli`, [repo](https://github.com/ast-grep/ast-grep)) | structural lint rules the agent must obey (Phase 4) |
-| **[openapi-typescript](https://openapi-ts.dev)** ([repo](https://github.com/openapi-ts/openapi-typescript)) | generates compile-time API models; `ContactRequest` is derived from them and consumed by the typed client (`npm run generate:types`) |
-| **[node:test](https://nodejs.org/api/test.html)** | unit tests for the core harness (`npm run test:harness`) and optional eval tooling (`npm run test:eval`) |
-| **[`@cursor/sdk`](https://www.npmjs.com/package/@cursor/sdk)** | runs a real agent unattended for the advanced evals (Phase 8); needs `CURSOR_API_KEY` |
-| **[Agent Skills](https://agentskills.io/home)** (`.agents/skills/<name>/SKILL.md`) | the agent's recipes, in the open [Agent Skills](https://agentskills.io/home) format: a folder with a `SKILL.md` (name + description + instructions) that the agent loads only when a task matches. **Tool-agnostic**: any skills-compatible agent can use them; Cursor finds them through the `.cursor/skills` symlink to `.agents/skills`, another tool needs its own symlink or path |
-| **Cursor project rules** (`.cursor/rules/*.mdc`) | file-scoped layer contracts loaded automatically while the agent edits data, fixtures, page objects, API clients, or specs |
-| **[Cursor](https://cursor.com) agent and [hooks](https://cursor.com/docs/hooks)** | the agent follows the skills and writes code; Cursor's native `stop` event invokes the fast domain validator and can send failures back as a follow-up |
-| **[git hooks](https://git-scm.com/docs/githooks)** (`git config core.hooksPath`, set by `npm install`) | the pre-push check for every contributor, not just the agent |
-| **[git](https://git-scm.com)** + **[GitHub Actions](https://docs.github.com/actions)** + **[`gh` CLI](https://cli.github.com)** | version control, CI that keeps it green (Phase 7), and opening the PR (Phase 6) |
+| [git](https://git-scm.com) + pre-push hook | blocks a red push for every contributor, not just the agent (`git config core.hooksPath`, set by `npm install`) |
+| [GitHub Actions](https://docs.github.com/actions) + [`gh` CLI](https://cli.github.com) | CI that runs the same `npm run validate` as pre-push; `gh` opens the PR |
 
-## How to use this repo
+**Runtime**
 
-This repo is a complete worked example with two distinct parts:
+| Tool | Role |
+|---|---|
+| [Node.js](https://nodejs.org) ≥ 22 + [npm](https://docs.npmjs.com) | script runner for every `npm run …` command |
+| [tsx](https://tsx.is) | runs harness TypeScript directly, no build step |
 
-- the Playwright framework in `src/` and `tests/`: config, generated OpenAPI types, typed API clients, data builders/runtime schemas, page objects, global authentication setup, and dependency-injection fixtures;
-- the automation harness in `.agents/`: skills, schemas, domain gates, hook integration, and optional evals.
+## Setup
 
-The course builds the harness around the supplied framework and `TOOL-1` inputs. The finished repository is a reference implementation rather than a blank starter.
-
-Run `npm install && npx playwright install chromium`. Copy `.env.example` to `.env`.
-
-In normal use, ask Cursor to automate the supplied manual test JSON and story. `AGENTS.md` supplies the always-on conventions, matching `.cursor/rules/` add file-scoped layer contracts, and the `automate-test-case` skill sequences live exploration and spec generation. When the agent tries to finish, Cursor's native `stop` event runs the fast domain validator in complete mode; `validate.ts --hook` only formats project-specific failures as a follow-up. The generation skills run targeted lint and Playwright commands, while pre-push and CI run the authoritative `npm run validate`.
+```
+npm install && npx playwright install chromium
+cp .env.example .env
+```
 
 Each phase below has the same shape: **Why** (what goes wrong without it), **Example** (a concrete before/after), **Build** (what to create), **Acceptance** (a command that must pass before you move on).
 
-## What you are given
+## What is in this repo
 
-Think of the repo in two layers: the **starting point** you are handed, and the **finished pipeline** you build phase by phase. The second table is a map of every part of the finished one. Open it when you reach that phase, or later when you adopt a piece in your own project.
+**Inputs** — what the pipeline is built around
 
-### The starting point
-
-| Given | Where |
+| What | Where |
 |---|---|
-| Story + manual test cases for `TOOL-1` (contact form); the test cases are a Jira/Xray export | `.agents/manual-to-autotests-pipeline/stories/TOOL-1.md`, `.../test-cases/TOOL-1.json` |
-| Test strategy the agent must follow. `wiki/` is the project's context folder: the agent reads it before it works, so put anything it should know there (domain glossary, environments, naming rules, known bugs, architecture notes) next to the strategy | `wiki/TEST-STRATEGY.md` |
-| Playwright framework the generated specs use: environment/timeouts, generated OpenAPI types, `BaseApi` + composed `ToolshopApi` clients, Zod `readJson`, data builders/enums/schemas, `BasePage` + `ContactPage`, global customer login, fixture injection, tags, and API/UI projects | `src/`, `tests/fixtures/`, `tests/global.setup.ts`, `playwright.config.ts` |
-| Supporting [Agent Skills](https://agentskills.io/home) the spec skills delegate to: `playwright-cli`, `probe-sut`, `create-locators`, `pom-builder`, `data-layer`, `test-data-state-management`, `test-stability`, `playwright-annotations`, `typescript-types`, `architecture-best-practices`, `code-review`, `github-ci` | `.agents/skills/` |
-| Agent contract and native enforcement: always-on conventions, file-scoped layer rules, `tsc` for types, ESLint for imports/Playwright rules, and ast-grep for code shapes | `AGENTS.md`, `.cursor/rules/`, `tsconfig.json`, `eslint.config.mjs`, `tools/ast-grep/rules/` |
+| System under test: Toolshop contact form (`TOOL-1`) | UI: practicesoftwaretesting.com, API: api.practicesoftwaretesting.com |
+| Requirements: story + manual test cases (Jira/Xray export) | `stories/TOOL-1.md`, `test-cases/TOOL-1.json` |
+| Project context: domain glossary, environments, naming rules, known bugs | `wiki/` |
+| TAF: Playwright typed clients, page objects, data builders, fixture injection | `src/`, `tests/fixtures/` |
+| Agent contract: always-on conventions, file-scoped layer rules | `AGENTS.md`, `.cursor/rules/` |
 
-### The finished pipeline (what you build)
+**Agent concerns** — skills and rules
 
-Custom code is kept to what native tools cannot know. Everything else is an npm script over TypeScript, ESLint, ast-grep and Playwright.
+| What | Where |
+|---|---|
+| Design record: stages, artifacts, gate scope, rejected options | `docs/adr/` |
+| Entry skill: one prompt → input check → SUT exploration → spec generation → verification | `.agents/skills/automate-test-case/` |
+| Analyse-SUT skill: live session recipe that produces the JSON artifact | `.agents/skills/analyse-sut/` |
+| API and UI spec skills | `.agents/skills/create-api-spec/`, `.agents/skills/create-ui-spec/` |
+| Supporting skills: `probe-sut`, `create-locators`, `pom-builder`, `data-layer`, `test-stability`, `code-review`, … | `.agents/skills/` |
+| File-scoped rules: data, fixtures, POM, API client, spec layer contracts | `.cursor/rules/` |
 
-| Part | What it is | Where | Phase |
-|---|---|---|---|
-| Design record | the decision, the rejected options, the stage table | `docs/adr/` | 0 |
-| Gate result | `pass` / `warn` / `fail` and the Zod helper | `.agents/lib/gateResults.ts` | 1 |
-| Harness config | paths, timeouts, file patterns, eval protected files | `.agents/harness-config.ts` | 1 |
-| Pipeline validator | per ticket: inputs, exploration artifact, specs. One entry for the stop hook, the CLI and CI (`npm run validate:pipeline`) | `.agents/manual-to-autotests-pipeline/validate.ts` | 1 |
-| Input gates | test case and story schemas + gates | `.agents/manual-to-autotests-pipeline/input-validation/` | 1 |
-| Entry skill | sequences input, live exploration, API/UI generation, and verification for one natural prompt | `.agents/skills/automate-test-case/` | 1 |
-| Analyse skill | the recipe the agent follows | `.agents/skills/analyse-sut/` | 2 |
-| Exploration gates | the artifact schema and five exploration gates | `.agents/manual-to-autotests-pipeline/exploration-validation/` | 2 |
-| Spec skills | `create-api-spec`, `create-ui-spec` | `.agents/skills/create-*-spec/` | 3 |
-| File-scoped rules | data, fixture, POM, API-client, and spec contracts loaded for matching files | `.cursor/rules/` | 3 |
-| Spec gates | title/ID/level traceability, required manual-action steps, fixture injection, test-data ownership, and one test per test case | `.agents/manual-to-autotests-pipeline/specs-validation/` | 3 |
-| Static rules | TypeScript + ESLint + ast-grep, including the spec import boundary and Playwright code shapes | `tsconfig.json`, `eslint.config.mjs`, `tools/ast-grep/` | 4 |
-| Hooks | Cursor `stop` hook, git pre-push | `.cursor/hooks.json`, `.githooks/` | 5 |
-| Specs | the generated API and UI specs for `TOOL-1` | `tests/api/`, `tests/ui/` | 6 |
-| CI | `npm run validate`, then the api/ui matrix, with reports | `.github/workflows/tests.yml` | 7 |
-| Advanced eval (optional) | reusable eval engine plus a spec dataset, workspace builder, deterministic graders, opt-in LLM judge, and one CLI | `.agents/lib/eval/`, `.agents/manual-to-autotests-pipeline/eval/`, `scripts/run-eval.ts` | 8 |
-| Harness tests | `node:test` for core gates and rules (`npm run test:harness`); eval tests are separate (`npm run test:eval`) | `*.test.ts` under `.agents/` | all |
+**Validation scripts** — JSON validation, static analysis, and hooks
+
+| What | Where |
+|---|---|
+| Input schemas + domain gates (title, AC links, priority, story reference) | `.agents/manual-to-autotests-pipeline/input-validation/` |
+| Exploration artifact schema + five evidence gates (locators, network calls, findings, coverage) | `.agents/manual-to-autotests-pipeline/exploration-validation/` |
+| Spec convention gates: traceability, step names, fixture injection, hardcoded data, one test per case | `.agents/manual-to-autotests-pipeline/specs-validation/` |
+| `tsc`, ESLint (playwright + sonarjs), ast-grep rules, spec import boundary | `tsconfig.json`, `eslint.config.mjs`, `tools/ast-grep/` |
+| Single validation entry point for stop hook, CLI, and CI | `.agents/manual-to-autotests-pipeline/validate.ts`, `.agents/lib/` |
+| Cursor stop hook: validator fires after every turn, failures injected as follow-up | `.cursor/hooks.json` |
+| Git pre-push hook: `npm run validate` blocks a bad push | `.githooks/` |
+| Evals (optional): agent runner, deterministic graders, optional LLM judge, CLI | `.agents/lib/eval/`, `.agents/manual-to-autotests-pipeline/eval/` |
+
+**TAF + CI** — generated tests and CI
+
+| What | Where |
+|---|---|
+| Generated API + UI specs for `TOOL-1` | `tests/api/`, `tests/ui/` |
+| CI workflow: validate → api/ui matrix → reports | `.github/workflows/tests.yml` |
 
 The full folder map is under [Layout](#layout).
 
@@ -147,6 +227,8 @@ The full folder map is under [Layout](#layout).
 }
 ```
 
+A person or the agent may validate or refine the test case (sharpen a vague `expected result`, add a missing precondition, split a case). The input schema and gates run on every change through the stop hook, so whatever edits the file, the Jira/Xray shape and the rules above stay enforced.
+
 Now compare two versions of one step's expected result:
 
 ```json
@@ -163,51 +245,23 @@ Now compare two versions of one step's expected result:
 
 The first cannot be turned into an assertion: what does "not work" check? The second names the status and the field, so the spec practically writes itself. A gate should tell the two apart.
 
-A person or the agent may refine it (sharpen a vague `expected result`, add a missing precondition, split a case). The input schema and gates run on every change through the stop hook, so whatever edits the file, the Jira/Xray shape and the rules above stay enforced.
-
 > **Think first.** You are handed a manual test case file. Before you read our list: what would you check, so that nothing downstream has to guess? Write down your own list, then compare it with the one below. What would you add?
 
-| Question to ask of the input | Our gate | A failure looks like |
+| What to check | Our gate | A failure looks like |
 |---|---|---|
-| Is the file shaped like a Jira/Xray test export at all (key, summary, component, steps, expected result)? | `schema` | `issues.0.fields.components: Invalid input: expected array` |
-| Does the file belong to the story its name says (every test links to one story, and the same one)? | `ticket-match`, schema | `file name says TOOL-2 but "ticket" is TOOL-1` |
-| Does every requirement link point to something real? | `ac-refs` | `acRefs not found in the story: TC-1 → AC-9` |
-| Can every expected result become an assertion? | `concrete-expected` | `expected result is too vague to assert on: TC-2 step 3` |
-| Are ids and titles unique (one title ↔ one test)? | schema refinement | `duplicate id TC-1` |
-| Is there a story to trace against? (optional) | `story` | warn, not fail: `no story found` |
-| Do the cases cover both levels the strategy asks for? | `level-coverage` | warn: `only api test cases` |
-| Is the strategy the agent must follow present? | `strategy` | `wiki/TEST-STRATEGY.md is missing` |
+| Required fields present and correctly typed: `key`, `summary`, `components`, `priority`, `steps`, `expectedResult` | `schema` | `issues.0.fields.components: Invalid input: expected array` |
+| `steps` is a non-empty array; each step has a non-null, non-empty action | `schema` | `steps.0.action: Required` |
+| `expectedResult` is non-null and non-empty on every step | `schema` | `steps.2.expectedResult: too short to assert on` |
+| `priority` is one of the allowed values (`Critical`, `High`, `Medium`, `Low`) | `schema` | `priority: invalid enum value — got "Blocker"` |
+| Test case links to a story, and all tests in the file link to the same story | `ticket-match` | `file name says TOOL-2 but "ticket" is TOOL-1` |
+| Every requirement reference (`acRefs`) exists in the linked story | `ac-refs` | `acRefs not found in the story: TC-1 → AC-9` |
+| Each expected result is concrete enough to become an assertion (no "should work", "not error") | `concrete-expected` | `expected result is too vague to assert on: TC-2 step 3` |
+| IDs and titles are unique across the file | `schema` refinement | `duplicate id TC-1` |
+| Story file is present to trace against (optional) | `story` | warn: `no story found` |
+| Test-strategy wiki is present for the agent to read | `strategy` | `wiki/TEST-STRATEGY.md is missing` |
 
-Ideas we did not build, if you want a harder version: an API step whose `expected result` names no status code; a UI step whose `data` names a field the story never mentions; a test case with no precondition when the steps need an authenticated user.
 
-This is also where the harness is born. You can't check anything without a way to express a result and a way to run it, so build the minimal core here and immediately point it at `TOOL-1.json`. Later phases grow it next to the first thing that needs each piece, with no big framework up front.
-
-**Build** three things, in this order. Files in this repo are in brackets.
-
-1. **One validator.** A command that takes a ticket, runs its checks, prints each result and exits non-zero if one failed. It is the one entry point the hook, CI and you will all call. (`.agents/manual-to-autotests-pipeline/validate.ts`, with the result type in `.agents/lib/gateResults.ts`)
-2. **Concrete input validation checks.** The schema for the test case file and the gates from the table above, as a function that takes a ticket and returns its results. (`.agents/manual-to-autotests-pipeline/input-validation/`)
-3. **One place for shared facts:** directories, file patterns and timeouts, so no check hard-codes a path. (`.agents/harness-config.ts`)
-
-Run the validator by hand and by npm script (`npm run validate:pipeline`); you wire it to the agent's `stop` event and to git in Phase 5. A validator that works from the command line is what makes that wiring trivial. Build it with only the input checks and point it at `TOOL-1` before you write more. The whole idea fits on one screen:
-
-```ts
-type GateResult = { gate: string; status: 'pass' | 'warn' | 'fail'; detail?: string }   // one vocabulary for every check
-const hasFailure = (gates: GateResult[]) => gates.some(g => g.status === 'fail')
-
-function validateTicket(root: string, ticket: string): GateResult[] {
-  const input = reviewInput(root, ticket)                    // Phase 1: schema, story, AC links, concrete expected
-  return input.gates                                         // Phase 2 and 3 append the artifact and spec gates here
-}
-
-for (const ticket of ticketsOf(process.cwd())) {
-  const gates = validateTicket(process.cwd(), ticket)
-  for (const g of gates) out(`${ICON[g.status]} ${g.gate} ${g.detail ?? ''}`)              // the agent reads this output
-  failed ||= hasFailure(gates)                                                             // any fail blocks
-}
-process.exit(failed ? 1 : 0)                                                               // the exit code is what hooks and CI act on
-```
-
-Why it is one function per ticket and not a plugin registry: the three phases always run in the same order on the same ticket, so adding a phase is adding a few lines. The real validator also has a `--hook` mode (Phase 5) that turns failures into a follow-up message for the agent, and a `--progress` mode that only demands what the work so far implies (an artifact once a spec exists), while the default demands everything.
+**Build**
 
 Make the schema reject bad data itself, so the gates have less to do. A few lines carry most of the idea:
 
@@ -230,9 +284,12 @@ export const testCaseFileSchema = xrayExportSchema
 
 The conventions behind it: fixed sets are `z.enum`; non-empty strings and id patterns are `.min(1)` / `.regex`; optional means *explicitly* optional; `.nullable()` is for "genuinely unknown" so the agent never has to invent a value; types come from `z.infer`, never a hand-written copy; parse with `safeParse`, never a cast or `any`. You can also consider `.strict()` objects so a typo'd key is an error instead of being dropped.
 
-`npm run schema:update` exports the Zod schemas as JSON Schema (`*.schema.json`), so editors and the agent can read the contract without running code. `npm run schema:check` (part of `validate`) fails when a committed file is stale; validation never rewrites files.
+ **Concrete input validation checks.** The schema for the test case file and the gates from the table above, as a function that takes a ticket and returns its results. (`.agents/manual-to-autotests-pipeline/input-validation/`)
 
-*Acceptance:* `npm run validate:pipeline -- --progress TOOL-1` passes. A copy with a vague `expected result` or an unknown `AC-9` fails with a message an agent can act on. Write a passing and a failing fixture per gate (`node:test`).
+
+Run the validator by hand and by npm script (`npm run validate:pipeline`); you wire it to the agent's `stop` event and to git in Phase 5.
+
+*Acceptance:* `npm run validate:pipeline -- --progress TOOL-1` passes. A copy with a vague `expected result` or an unknown `AC-9` fails with a message an agent can act on.
 
 ## Phase 2 — Analyse the SUT
 
@@ -272,17 +329,13 @@ Skill steps: read strategy → resolve auth → walk the UI with `playwright-cli
 
 ### Define the agent contract before generating code
 
-The goal is correct code on the first run, not code that becomes correct only after lint repeatedly rejects it. Define guidance at three activation levels:
+The goal is correct code on the first run, not code that becomes correct only after lint repeatedly rejects it. Use the three layers from the [Agentic tool concepts](#agentic-tool-concepts) section:
 
-- **Always on — `AGENTS.md`:** repository-wide safety rules, layer direction, imports, typing, and test conventions that apply to every task.
-- **File scoped — `.cursor/rules/*.mdc`:** detailed contracts activated by matching files. Rules deliberately overlap: while editing a spec, the data and fixture rules also load; UI specs additionally load the POM rule, and API specs load the API-client rule.
-- **On demand — `.agents/skills/*/SKILL.md`:** procedural workflows such as analysing the SUT, creating an API/UI spec, choosing locators, building a page object, or managing test state.
+- **`AGENTS.md`:** always-on repository-wide conventions.
+- **`.cursor/rules/*.mdc`:** file-scoped layer contracts. Rules deliberately overlap: while editing a spec, the data and fixture rules also load; UI specs additionally load the POM rule, and API specs load the API-client rule.
+- **`.agents/skills/*/SKILL.md`:** on-demand procedural workflows such as analysing the SUT, creating an API/UI spec, choosing locators, building a page object, or managing test state.
 
-Other coding agents provide analogous instruction layers: Claude Code uses `CLAUDE.md` and `.claude/rules/`; GitHub Copilot uses `.github/copilot-instructions.md` and path-scoped `.github/instructions/*.instructions.md`. Adapt the same contracts to the supported format of the agent used by the project.
-
-The automation engineer must define these conventions for the real project before asking the agent to generate tests. Adapt the supplied examples to the project's architecture, naming, data ownership, fixture model, and quality bar; do not copy rules or skills that describe a different framework. Keep them current when the framework changes.
-
-Keep each fact at the narrowest useful level: universal policy in `AGENTS.md`, layer contracts in project rules, and multi-step instructions in skills. ESLint, ast-grep, TypeScript, pipeline gates, and Playwright are the second phase—a deterministic safety net and feedback loop, not the primary source of coding instructions.
+Keep each fact at the narrowest useful level: universal policy in `AGENTS.md`, layer contracts in project rules, and multi-step instructions in skills. ESLint, ast-grep, TypeScript, pipeline gates, and Playwright are the second phase — a deterministic safety net and feedback loop, not the primary source of coding instructions.
 
 The TypeScript compiler API reads each spec, so an annotation belongs to its own test rather than to a nearby string or comment.
 
@@ -299,12 +352,6 @@ API contract checks:
 
 - **OpenAPI types:** compile-time payload and client contracts.
 - **Zod + `readJson`:** runtime response shape from the live server.
-
-Eval-only checks:
-
-- **Golden parity:** expected statuses and assertion matcher strength. The normal pipeline has no golden answer.
-- **Anti-shortcut:** no disabled tests, inappropriate `test.fail`, or edits to protected inputs/config.
-- **LLM judge (advisory):** expected-result assertion quality. It can false-positive and never decides task pass/fail.
 
 Skills are generic: no Toolshop endpoints inside. Keep them short by **delegating** to the supporting skills (each step names the skill to read) instead of repeating their rules. They must say how to map each finding to an assertion, reuse before creating, where data/POM/fixtures live, and how to verify (`validate:pipeline`, `playwright test`).
 
