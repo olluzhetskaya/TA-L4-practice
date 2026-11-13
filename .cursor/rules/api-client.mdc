@@ -1,0 +1,28 @@
+---
+description: API-client contract for typed endpoint methods and request ownership
+globs: "src/helpers/api/**/*.ts, tests/api/**/*.spec.ts"
+alwaysApply: false
+---
+
+# API clients
+
+- This is the only layer that calls `request.get/post/put/patch/delete`.
+- Expose typed endpoint methods returning `APIResponse`; derive payloads from `@generated/*`.
+- Keep assertions, test data, fixtures, and lifecycle out of clients.
+- Read URLs, credentials, and timeouts from `src/config/`; parse bodies with `readJson` at the consuming boundary.
+
+```typescript
+// ❌ Direct request and payload in a spec
+const response = await request.post('/messages', { data: { email: 'bad' } })
+
+// ✅ Typed feature client
+send(payload: ContactRequest): Promise<APIResponse> {
+  return this.request.post('/messages', { data: payload })
+}
+
+// ✅ Spec uses injected client, data builder, and concrete response assertions
+const response = await toolshopApi.contact.send(buildContactRequest())
+await expect(response, 'Contact request should be accepted').toBeOK()
+const created = await readJson(response, contactMessageSchema)
+expect(created, 'Response should echo the request').toMatchObject(expectedMessage)
+```

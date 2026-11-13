@@ -1,0 +1,38 @@
+---
+description: Page-object contract for semantic locators and user-level browser operations
+globs: "src/pages/**/*.ts, tests/ui/**/*.spec.ts"
+alwaysApply: false
+---
+
+# Page objects
+
+- Own semantic locators and user operations; specs own steps and assertions.
+- Accept typed inputs from `src/data/`; keep routes named and configuration in `src/config/`.
+- Never import `expect`, fixtures, `test.step`, or `test.info`.
+- Return `Locator`, not booleans, so specs can use auto-retrying assertions.
+
+```typescript
+// ❌ CSS locator and assertion hidden in the page object
+async verifySubmitted(): Promise<void> {
+  await expect(this.page.locator('#success')).toHaveText('Thanks!')
+}
+
+// ✅ Verified semantic locator exposed to the spec
+getSendButton(): Locator {
+  return this.page.getByRole('button', { name: 'Send' })
+}
+
+getAlert(text: string): Locator {
+  return this.page.getByRole('alert').filter({ hasText: text })
+}
+
+async fillForm(input: ContactFormInput): Promise<void> {
+  await this.getFirstNameInput().fill(input.firstName)
+  await this.getEmailInput().fill(input.email)
+}
+
+// ✅ Spec owns the assertion
+await expect(contactPage.getAlert(ContactCopy.confirmation), 'Confirmation should appear').toHaveText(
+  ContactCopy.confirmation,
+)
+```

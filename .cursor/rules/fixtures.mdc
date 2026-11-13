@@ -1,0 +1,38 @@
+---
+description: Fixture contract for dependency injection, setup, teardown, and the @fixtures barrel
+globs: "tests/fixtures/**/*.ts, tests/**/*.spec.ts"
+alwaysApply: false
+---
+
+# Fixtures
+
+- Own contexts, clients, page objects, authentication, seeded state, and cleanup.
+- Seed through typed API clients and return typed state; never establish preconditions through the UI.
+- Keep assertions and business expectations out of fixtures.
+- Re-export spec dependencies through `@fixtures`; keep scenario-internal seed values inside typed fixture state.
+
+```typescript
+// ❌ Spec creates framework objects and owns lifecycle
+test('x', async ({ page, request }) => {
+  const contactPage = new ContactPage(page)
+  const api = new ToolshopApi(request)
+})
+
+// ✅ Fixture injects abstractions and disposes owned resources
+export const test = base.extend<ToolshopFixtures>({
+  toolshopApi: async ({ playwright }, use) => {
+    const request = await playwright.request.newContext({ baseURL: env.apiUrl })
+    await use(new ToolshopApi(request))
+    await request.dispose()
+  },
+
+  contactPage: async ({ page }, use) => {
+    await use(new ContactPage(page))
+  },
+})
+
+// ✅ Spec receives only abstractions
+test('x', async ({ contactPage, toolshopApi }) => {
+  // steps and assertions only
+})
+```

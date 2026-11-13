@@ -1,6 +1,6 @@
 # Coding conventions
 
-Apply to every file in the framework (`src/`, `tests/`) and to the harness (`.agents/`). They are always on — skills do not repeat them. Layer-specific guidance lives in the skills; the rules below are enforced by `npm run validate` (typecheck, eslint, ast-grep, pipeline gates).
+Apply to every file in the framework (`src/`, `tests/`) and to the harness (`.agents/`). These rules are always on. File-scoped contracts in `.cursor/rules/` activate for the implementation layer and its consuming specs; procedural skills load on demand for a specific task. Together they guide generation before `npm run validate` checks the result.
 
 ## Never violate
 

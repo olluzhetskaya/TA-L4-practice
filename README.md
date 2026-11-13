@@ -37,6 +37,7 @@ The whole design is one bet: an agent is excellent at *producing* text and poor 
 | **[node:test](https://nodejs.org/api/test.html)** | unit tests for the core harness (`npm run test:harness`) and optional eval tooling (`npm run test:eval`) |
 | **[`@cursor/sdk`](https://www.npmjs.com/package/@cursor/sdk)** | runs a real agent unattended for the advanced evals (Phase 8); needs `CURSOR_API_KEY` |
 | **[Agent Skills](https://agentskills.io/home)** (`.agents/skills/<name>/SKILL.md`) | the agent's recipes, in the open [Agent Skills](https://agentskills.io/home) format: a folder with a `SKILL.md` (name + description + instructions) that the agent loads only when a task matches. **Tool-agnostic**: any skills-compatible agent can use them; Cursor finds them through the `.cursor/skills` symlink to `.agents/skills`, another tool needs its own symlink or path |
+| **Cursor project rules** (`.cursor/rules/*.mdc`) | file-scoped layer contracts loaded automatically while the agent edits data, fixtures, page objects, API clients, or specs |
 | **[Cursor](https://cursor.com) agent and [hooks](https://cursor.com/docs/hooks)** | the agent follows the skills and writes code; Cursor's native `stop` event invokes the fast domain validator and can send failures back as a follow-up |
 | **[git hooks](https://git-scm.com/docs/githooks)** (`git config core.hooksPath`, set by `npm install`) | the pre-push check for every contributor, not just the agent |
 | **[git](https://git-scm.com)** + **[GitHub Actions](https://docs.github.com/actions)** + **[`gh` CLI](https://cli.github.com)** | version control, CI that keeps it green (Phase 7), and opening the PR (Phase 6) |
@@ -52,7 +53,7 @@ The course builds the harness around the supplied framework and `TOOL-1` inputs.
 
 Run `npm install && npx playwright install chromium`. Copy `.env.example` to `.env`.
 
-In normal use, ask Cursor to automate the supplied manual test JSON and story. The `automate-test-case` skill saves the input, sequences live exploration and spec generation, and runs the relevant checks. When the agent tries to finish, Cursor's native `stop` event runs the fast domain validator in complete mode; `validate.ts --hook` only formats project-specific failures as a follow-up. The generation skills run targeted lint and Playwright commands, while pre-push and CI run the authoritative `npm run validate`.
+In normal use, ask Cursor to automate the supplied manual test JSON and story. `AGENTS.md` supplies the always-on conventions, matching `.cursor/rules/` add file-scoped layer contracts, and the `automate-test-case` skill sequences live exploration and spec generation. When the agent tries to finish, Cursor's native `stop` event runs the fast domain validator in complete mode; `validate.ts --hook` only formats project-specific failures as a follow-up. The generation skills run targeted lint and Playwright commands, while pre-push and CI run the authoritative `npm run validate`.
 
 Each phase below has the same shape: **Why** (what goes wrong without it), **Example** (a concrete before/after), **Build** (what to create), **Acceptance** (a command that must pass before you move on).
 
@@ -68,7 +69,7 @@ Think of the repo in two layers: the **starting point** you are handed, and the 
 | Test strategy the agent must follow. `wiki/` is the project's context folder: the agent reads it before it works, so put anything it should know there (domain glossary, environments, naming rules, known bugs, architecture notes) next to the strategy | `wiki/TEST-STRATEGY.md` |
 | Playwright framework the generated specs use: environment/timeouts, generated OpenAPI types, `BaseApi` + composed `ToolshopApi` clients, Zod `readJson`, data builders/enums/schemas, `BasePage` + `ContactPage`, global customer login, fixture injection, tags, and API/UI projects | `src/`, `tests/fixtures/`, `tests/global.setup.ts`, `playwright.config.ts` |
 | Supporting [Agent Skills](https://agentskills.io/home) the spec skills delegate to: `playwright-cli`, `probe-sut`, `create-locators`, `pom-builder`, `data-layer`, `test-data-state-management`, `test-stability`, `playwright-annotations`, `typescript-types`, `architecture-best-practices`, `code-review`, `github-ci` | `.agents/skills/` |
-| Coding conventions the agent reads (`AGENTS.md`) and native enforcement: `tsc` for types, ESLint for imports/Playwright rules, and ast-grep for code shapes (Phase 4) | `AGENTS.md`, `tsconfig.json`, `eslint.config.mjs`, `tools/ast-grep/rules/` |
+| Agent contract and native enforcement: always-on conventions, file-scoped layer rules, `tsc` for types, ESLint for imports/Playwright rules, and ast-grep for code shapes | `AGENTS.md`, `.cursor/rules/`, `tsconfig.json`, `eslint.config.mjs`, `tools/ast-grep/rules/` |
 
 ### The finished pipeline (what you build)
 
@@ -85,6 +86,7 @@ Custom code is kept to what native tools cannot know. Everything else is an npm 
 | Analyse skill | the recipe the agent follows | `.agents/skills/analyse-sut/` | 2 |
 | Exploration gates | the artifact schema and five exploration gates | `.agents/manual-to-autotests-pipeline/exploration-validation/` | 2 |
 | Spec skills | `create-api-spec`, `create-ui-spec` | `.agents/skills/create-*-spec/` | 3 |
+| File-scoped rules | data, fixture, POM, API-client, and spec contracts loaded for matching files | `.cursor/rules/` | 3 |
 | Spec gates | title/ID/level traceability, required manual-action steps, fixture injection, test-data ownership, and one test per test case | `.agents/manual-to-autotests-pipeline/specs-validation/` | 3 |
 | Static rules | TypeScript + ESLint + ast-grep, including the spec import boundary and Playwright code shapes | `tsconfig.json`, `eslint.config.mjs`, `tools/ast-grep/` | 4 |
 | Hooks | Cursor `stop` hook, git pre-push | `.cursor/hooks.json`, `.githooks/` | 5 |
@@ -267,6 +269,18 @@ Skill steps: read strategy → resolve auth → walk the UI with `playwright-cli
 **Example.** The agent writes `test('contact form works', …)` with no annotation. The `tc-trace` gate fails: `"contact form works" is not a test case title in TOOL-1`. After the fix the test is titled `Verify that a visitor can send a message through the contact form` (the manual title, verbatim) and carries `annotation: testCase('TC-3')`, which links it back to the manual test case.
 
 **Build** two recipes, one for API specs and one for UI specs (`.agents/skills/create-api-spec/`, `.agents/skills/create-ui-spec/`), and the spec gates that check what they produce (`.agents/manual-to-autotests-pipeline/specs-validation/`).
+
+### Define the agent contract before generating code
+
+The goal is correct code on the first run, not code that becomes correct only after lint repeatedly rejects it. Define guidance at three activation levels:
+
+- **Always on — `AGENTS.md`:** repository-wide safety rules, layer direction, imports, typing, and test conventions that apply to every task.
+- **File scoped — `.cursor/rules/*.mdc`:** detailed contracts activated by matching files. Rules deliberately overlap: while editing a spec, the data and fixture rules also load; UI specs additionally load the POM rule, and API specs load the API-client rule.
+- **On demand — `.agents/skills/*/SKILL.md`:** procedural workflows such as analysing the SUT, creating an API/UI spec, choosing locators, building a page object, or managing test state.
+
+The automation engineer must define these conventions for the real project before asking the agent to generate tests. Adapt the supplied examples to the project's architecture, naming, data ownership, fixture model, and quality bar; do not copy rules or skills that describe a different framework. Keep them current when the framework changes.
+
+Keep each fact at the narrowest useful level: universal policy in `AGENTS.md`, layer contracts in project rules, and multi-step instructions in skills. ESLint, ast-grep, TypeScript, pipeline gates, and Playwright are the second phase—a deterministic safety net and feedback loop, not the primary source of coding instructions.
 
 The TypeScript compiler API reads each spec, so an annotation belongs to its own test rather than to a nearby string or comment.
 
@@ -543,6 +557,7 @@ wiki/TEST-STRATEGY.md                  what the agent must follow
     test-cases/  stories/  artifacts/  inputs and analyse-sut outputs
     eval/                              advanced: spec tasks, dataset, skeleton, graders (Phase 8)
 scripts/run-eval.ts                    advanced eval CLI
+.cursor/rules/                         file-scoped data, fixture, POM, API-client, and spec contracts
 .cursor/hooks.json                     stop hook
 .githooks/pre-push                     runs npm run validate
 tools/ast-grep/                        rules

@@ -1,0 +1,40 @@
+---
+description: Data-layer contract for builders, enums, constants, generated types, and runtime schemas
+globs: "src/data/**/*.ts, tests/**/*.spec.ts"
+alwaysApply: false
+---
+
+# Data layer
+
+- Own builders, enums, limits, expected copy, and Zod response schemas.
+- Derive request types from `@generated/*`; validate live response bodies with Zod.
+- Keep this layer pure: no browser, request, filesystem, fixture, or assertion I/O.
+
+```typescript
+// ❌ Inline in a spec
+await toolshopApi.contact.send({ email: 'bad', message: 'x'.repeat(251) })
+
+// ✅ src/data/contact.ts
+export type ContactRequest = components['schemas']['ContactRequest']
+export const ContactRules = { messageMaxLength: 250, overMaxLength: 251 } as const
+
+export function buildContactRequest(overrides: Partial<ContactRequest> = {}): ContactRequest {
+  return {
+    name: 'Jane Doe',
+    email: 'jane.doe@example.com',
+    subject: ContactSubject.CustomerService,
+    message: VALID_MESSAGE,
+    ...overrides,
+  }
+}
+
+export const contactMessageSchema = z.object({
+  id: z.string().min(1),
+  status: z.enum(MessageStatus),
+})
+
+// ✅ Spec consumes the contract through @fixtures
+const response = await toolshopApi.contact.send(
+  buildContactRequest({ message: textOfLength(ContactRules.overMaxLength) }),
+)
+```

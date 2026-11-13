@@ -1,0 +1,40 @@
+---
+description: Playwright spec contract for traceability, fixtures, steps, data, and assertions
+globs: tests/**/*.spec.ts
+alwaysApply: false
+---
+
+# Playwright specs
+
+- Exact manual title and `testCase('TC-n')`; one test at its declared API/UI level.
+- Import only `@fixtures`; inject abstractions, never raw `page` or `request`.
+- Keep setup, locators, navigation, HTTP calls, cleanup, payloads, and expected data in their owning layers.
+- Every manual action becomes a `Verify that …` / `Confirm that …` step.
+- Every assertion has a message and uses the strongest matcher for the contract.
+
+```typescript
+// ❌ Raw browser, inline data, non-retrying generic comparison
+import { expect, test } from '@playwright/test'
+test('contact works', async ({ page }) => {
+  await page.goto('/contact')
+  expect(await page.getByRole('alert').textContent()).toBe('Thanks!')
+})
+
+// ✅ Traceable, injected, data-owned, auto-retrying assertion
+import { ContactCopy, expect, Tag, test, testCase } from '@fixtures'
+
+test(
+  'Verify that a visitor can send a message through the contact form',
+  { tag: [Tag.Ui], annotation: testCase('TC-3') },
+  async ({ contactPage }) => {
+    await test.step('Confirm that send the form', async () => {
+      await contactPage.submit()
+      await expect(contactPage.getAlert(ContactCopy.confirmation), 'Confirmation should be displayed').toHaveText(
+        ContactCopy.confirmation,
+      )
+    })
+  },
+)
+```
+
+Use `toHaveText`, `toHaveValue`, `toMatchObject`, `toEqual`, or an exact `HttpStatus` assertion according to the expected result. Use `expect.poll` / `toPass` for eventual state; never sleep or branch to choose an assertion.
