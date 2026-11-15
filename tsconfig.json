@@ -11,15 +11,14 @@
     "allowImportingTsExtensions": true,
     "noEmit": true,
     "types": ["node"],
-    "baseUrl": ".",
     "paths": {
-      "@fixtures": ["tests/fixtures/index.ts"],
-      "@data/*": ["src/data/*"],
-      "@pages/*": ["src/pages/*"],
-      "@helpers/*": ["src/helpers/*"],
-      "@config/*": ["src/config/*"],
-      "@generated/*": ["src/types/generated/*"],
-      "@src/*": ["src/*"]
+      "@fixtures": ["./tests/fixtures/index.ts"],
+      "@data/*": ["./src/data/*"],
+      "@pages/*": ["./src/pages/*"],
+      "@helpers/*": ["./src/helpers/*"],
+      "@config/*": ["./src/config/*"],
+      "@generated/*": ["./src/types/generated/*"],
+      "@src/*": ["./src/*"]
     }
   },
   "include": [
@@ -30,5 +29,5 @@
     "scripts/**/*.ts",
     "playwright.config.ts"
   ],
-  "exclude": ["node_modules", ".agents/manual-to-autotests-pipeline/eval/dataset/**", ".agents/manual-to-autotests-pipeline/eval/skeleton/**"]
+  "exclude": ["node_modules", ".agents/manual-to-autotests-pipeline/eval/dataset/**", ".agents/manual-to-autotests-pipeline/eval/skeleton/**", ".agents/manual-to-autotests-pipeline/eval/runs/**"]
 }
