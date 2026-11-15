@@ -580,6 +580,41 @@ One task, `TOOL-2 × api`. The agent writes `tests/api/TOOL-2.limits.api.spec.ts
 
 A task passes iff every non-advisory gate passes. Judge results are listed next to the others but never flip `passed`. Golden comparisons look at asserted statuses and matcher strength, not helper names or file layout, so a different valid implementation can pass.
 
+### More task examples
+
+The gate-by-gate walkthrough above is `TOOL-2 × api`. Two more task shapes exercise different parts of the skill — same gates, different criteria that matter.
+
+**`TOOL-3 × ui`** (full base, UI spec with POM)
+
+Inputs: a story for "search the product listing", three test cases (TC-1 search for an existing product, TC-2 search with no matches shows empty-state, TC-3 clear search restores full listing), and an exploration artifact that records `getByRole('searchbox')` as the input and `getByText('No products found')` as the empty state. No product bugs.
+
+| Criterion | Pass example | Fail example |
+|---|---|---|
+| **Coverage + traceability** | one `test` per TC with manual title + `testCase('TC-n')` + tag `Ui` | `"search works" is not a TC title in TOOL-3` |
+| **POM discipline** | spec calls `productsPage.search(…)` / `.getResults()`; no `page.getByRole` in the spec | `no-page-locator-in-spec at line 14` |
+| **Navigation in the POM** | `await productsPage.open()` — no `page.goto('/')` in the spec | `no-goto-in-spec at line 10` |
+| **Stability** | `await expect(...).toBeVisible()`; no `waitForTimeout`, no `.nth(0)` | `no-manual-sleep at line 22` |
+| **Assertion parity** | TC-1 asserts product visible by name, TC-2 asserts the empty-state message, TC-3 asserts baseline restored | `TC-2 lacks matcher: toBeVisible` |
+| **Isolation** | may add `src/pages/ProductsPage.ts`; must not rewrite the shared fixture | `tests/fixtures/toolshop.fixture.ts was modified` |
+| **Green execution** | `run:TC-1..3` all green against the live SUT | `run:TC-2: expected locator visible, got 0 matches` |
+| **Assertion intent** (advisory) | TC-2 asserts the empty state is *shown*, not merely that no product row exists | `judge:TC-2 does not verify the "No products found" message` |
+
+**`TOOL-1 × api`** (skeleton base, agent writes framework + spec)
+
+Inputs: the full `TOOL-1` test cases, story, and exploration artifact. The workspace has the reference feature stripped — `src/data/contact.ts`, `src/helpers/api/ContactApi.ts`, `src/pages/ContactPage.ts` are removed and `toolshop.fixture.ts` is neutralised. The agent must rebuild the framework pieces the spec depends on *in addition to* the spec itself.
+
+Every criterion from the `TOOL-2 × api` walkthrough still applies, plus:
+
+| Criterion | Pass example | Fail example |
+|---|---|---|
+| **API client exists** | `src/helpers/api/ContactApi.ts` exported from `ToolshopApi` with a typed `send(payload)` | `tsc: Cannot find module '@helpers/api/ContactApi'` |
+| **Data builder exists** | `src/data/contact.ts` exports a fixture builder (valid defaults + overrides) | `no-hardcoded-data: TC-1 inlines payload literal` |
+| **Fixture wired** | `tests/fixtures/toolshop.fixture.ts` exposes `toolshopApi`; spec imports only from `@fixtures` | `eslint: spec must import from @fixtures` |
+| **Types from OpenAPI** | request/response types come from generated OpenAPI, not hand-rolled | `tsc: unsafe cast / any` |
+| **Framework didn't regress** | `src/types/generated/`, `playwright.config.ts`, ESLint config unchanged | `protected-files: playwright.config.ts was modified` |
+
+With these three tasks (four specs: `TOOL-1 × api`, `TOOL-1 × ui`, `TOOL-2 × api`, `TOOL-3 × ui`) a skill edit produces a `tasks passed: X/4` number plus the per-signal rates below.
+
 ### Metrics the run exposes
 
 ```
